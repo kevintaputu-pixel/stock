@@ -18,6 +18,32 @@ function getBaseUrl(request: Request) {
   return new URL(request.url).origin.replace(/\/+$/, "");
 }
 
+async function getAdminEmails() {
+  const { data, error } = await supabaseAdmin
+    .from("app_data")
+    .select("value")
+    .eq("type", "email")
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    throw new Error(`Impossible de lire les e-mails admin : ${error.message}`);
+  }
+
+  const emails = Array.from(
+    new Set(
+      (data || [])
+        .map((row) => (typeof row.value === "string" ? row.value.trim() : ""))
+        .filter((value) => value.length > 0)
+    )
+  );
+
+  if (emails.length === 0) {
+    throw new Error("Aucune adresse e-mail admin trouvée dans app_data (type = email).");
+  }
+
+  return emails;
+}
+
 export async function POST(request: Request) {
   try {
     console.log("POST ACCESS REQUEST START");
@@ -46,6 +72,8 @@ export async function POST(request: Request) {
       throw new Error("SUPABASE_SERVICE_ROLE_KEY manquante");
     }
 
+    const adminEmails = await getAdminEmails();
+
     const { data: requestRow, error: requestError } = await supabaseAdmin
       .from("access_requests")
       .insert({
@@ -67,10 +95,11 @@ export async function POST(request: Request) {
     const approveUrl = `${baseUrl}/api/access-request?id=${requestRow.id}&approve=1`;
 
     console.log("APPROVE URL =", approveUrl);
+    console.log("ADMIN EMAILS =", adminEmails);
 
     const result = await resend.emails.send({
       from: process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev",
-      to: "kevintaputu@gmail.com",
+      to: adminEmails,
       subject: `Demande d'accès : ${page}`,
       html: `
         <div style="font-family: Arial, sans-serif; line-height: 1.6;">
