@@ -706,7 +706,7 @@ export default function EntreesPage() {
     doc.setFontSize(10);
     doc.text("Réf.", 16, y + 6.5);
     doc.text("Désignation", 38, y + 6.5);
-    doc.text("Fournisseur", 105, y + 6.5);
+    doc.text("Réf. fournisseur", 105, y + 6.5);
     doc.text("Qté", 175, y + 6.5);
     y += 10;
 
@@ -725,7 +725,7 @@ export default function EntreesPage() {
       doc.rect(14, y, pageWidth - 28, rowHeight);
       doc.text(item.ref_mag || "-", 16, y + 6.5, { maxWidth: 18 });
       doc.text(item.designation || "-", 38, y + 6.5, { maxWidth: 62 });
-      doc.text(item.fournisseur || "-", 105, y + 6.5, { maxWidth: 58 });
+      doc.text(item.ref_fournisseur || "-", 105, y + 6.5, { maxWidth: 58 });
       doc.text(String(qty), 175, y + 6.5, { maxWidth: 20 });
       y += rowHeight;
     }
@@ -907,8 +907,8 @@ export default function EntreesPage() {
                           color: currentTheme.textSoft,
                         }}
                       >
-                        Réf. magasin : {item.ref_mag || "-"} • Fournisseur :{" "}
-                        {item.fournisseur || "-"}
+                        Réf. magasin : {item.ref_mag || "-"} • Réf. fournisseur :{" "}
+                        {item.ref_fournisseur || "-"}
                       </div>
                     </div>
 
@@ -1102,8 +1102,8 @@ export default function EntreesPage() {
                           lineHeight: 1.5,
                         }}
                       >
-                        Réf. magasin : {product.ref_mag || "-"} • Fournisseur :{" "}
-                        {product.fournisseur || "-"}
+                        Réf. magasin : {product.ref_mag || "-"} • Réf. fournisseur :{" "}
+                        {product.ref_fournisseur || "-"}
                         <br />
                         Catégorie : {product.categorie || "-"} • Stock actuel :{" "}
                         {formatNumber(product.sf)}
@@ -1487,7 +1487,7 @@ export default function EntreesPage() {
                       lineHeight: 1.6,
                     }}
                   >
-                    Réf. magasin : {item.ref_mag || "-"} • Fournisseur : {item.fournisseur || "-"}
+                    Réf. magasin : {item.ref_mag || "-"} • Réf. fournisseur : {item.ref_fournisseur || "-"}
                     <br />
                     Catégorie : {item.categorie || "-"} • Zone : {item.zone || "-"}
                     <br />

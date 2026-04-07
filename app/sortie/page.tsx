@@ -1459,10 +1459,19 @@ export default function SortiePage() {
                           onClick={() => toggleFavoriteSelection(product.id)}
                           style={{
                             background: selected
-                              ? currentTheme.accent
+                              ? theme === "whiteBlue"
+                                ? "#dbeafe"
+                                : currentTheme.accent
                               : currentTheme.card,
-                            color: "#fff",
-                            border: "none",
+                            color: selected
+                              ? theme === "whiteBlue"
+                                ? "#0f172a"
+                                : "#fff"
+                              : currentTheme.text,
+                            border:
+                              selected && theme === "whiteBlue"
+                                ? "1px solid #93c5fd"
+                                : "none",
                             borderRadius: 12,
                             padding: "10px 12px",
                             fontWeight: 800,
