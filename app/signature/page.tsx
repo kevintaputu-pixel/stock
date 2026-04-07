@@ -1,6 +1,6 @@
 "use client";
 
-export const dynamic = "force-dynamic";
+
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
@@ -10,6 +10,8 @@ type RequestPayload = {
   status: string;
   signature_data_url?: string | null;
 };
+
+export const dynamic = "force-dynamic";
 
 export default function SignaturePage() {
   const searchParams = useSearchParams();
