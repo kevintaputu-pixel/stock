@@ -167,6 +167,8 @@ export default function SortiePage() {
   });
 
   const quantityRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const firstQuantityRef = useRef<HTMLInputElement | null>(null);
+  const previousOutputLengthRef = useRef(0);
 
   useEffect(() => {
     const savedTheme = localStorage.getItem("stock-theme");
@@ -195,6 +197,32 @@ export default function SortiePage() {
   useEffect(() => {
     loadProducts();
   }, []);
+
+  useEffect(() => {
+    const previousLength = previousOutputLengthRef.current;
+    const currentLength = outputItems.length;
+
+    if (currentLength === 0) {
+      firstQuantityRef.current = null;
+      previousOutputLengthRef.current = 0;
+      return;
+    }
+
+    if (currentLength > previousLength) {
+      const firstItem = outputItems[0];
+      const input = quantityRefs.current[firstItem.localId] ?? firstQuantityRef.current;
+
+      if (input) {
+        setTimeout(() => {
+          input.focus();
+          input.select();
+        }, 0);
+      }
+    }
+
+    previousOutputLengthRef.current = currentLength;
+  }, [outputItems]);
+
 
   function readFavoriteIds(group: FavoritesGroup) {
     try {
@@ -315,14 +343,29 @@ export default function SortiePage() {
   const currentTheme = themes[theme];
 
   function addExistingProductToLeft(product: Product) {
+    const newLocalId = crypto.randomUUID();
+
     setOutputItems((prev) => {
       const exists = prev.find((item) => item.productId === product.id);
-      if (exists) return prev;
+
+      if (exists) {
+        const firstItem = prev[0];
+
+        if (firstItem) {
+          setTimeout(() => {
+            const input = quantityRefs.current[firstItem.localId] ?? firstQuantityRef.current;
+            input?.focus();
+            input?.select();
+          }, 0);
+        }
+
+        return prev;
+      }
 
       return [
         ...prev,
         {
-          localId: crypto.randomUUID(),
+          localId: newLocalId,
           productId: product.id,
           categorie: product.categorie || "",
           ref_mag: product.ref_mag || "",
@@ -489,7 +532,6 @@ export default function SortiePage() {
         if (movementError) throw movementError;
       }
 
-      alert("Sorties enregistrées.");
       setOutputItems([]);
       setFinalModal({ open: false, personName: "" });
       await loadProducts();
@@ -786,14 +828,16 @@ export default function SortiePage() {
 
                   <div
                     style={{
-                      display: "grid",
-                      gridTemplateColumns: "1fr 170px 170px",
-                      gap: 12,
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: 14,
                       alignItems: "end",
                     }}
                   >
                     <div
                       style={{
+                        flex: "1 1 220px",
+                        minWidth: 0,
                         fontSize: 13,
                         color: currentTheme.textSoft,
                         lineHeight: 1.6,
@@ -806,38 +850,57 @@ export default function SortiePage() {
                       Stock actuel : {item.stock_actuel || "0"}
                     </div>
 
-                    <label style={{ display: "grid", gap: 6 }}>
-                      <span style={{ fontSize: 13, color: currentTheme.textSoft }}>
-                        Stock actuel
-                      </span>
-                      <input
-                        value={item.stock_actuel}
-                        readOnly
-                        style={{
-                          ...inputStyle(currentTheme),
-                          opacity: 0.7,
-                        }}
-                      />
-                    </label>
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: 12,
+                        alignItems: "end",
+                        flexShrink: 0,
+                      }}
+                    >
+                      <label style={{ display: "grid", gap: 6, width: 96 }}>
+                        <span style={{ fontSize: 13, color: currentTheme.textSoft }}>
+                          Stock actuel
+                        </span>
+                        <input
+                          value={item.stock_actuel}
+                          readOnly
+                          style={{
+                            ...inputStyle(currentTheme),
+                            width: 60,
+                            textAlign: "center",
+                            opacity: 0.7,
+                          }}
+                        />
+                      </label>
 
-                    <label style={{ display: "grid", gap: 6 }}>
-                      <span style={{ fontSize: 13, color: currentTheme.textSoft }}>
-                        Quantité
-                      </span>
-                      <input
-                        ref={(el) => {
-                          quantityRefs.current[item.localId] = el;
-                        }}
-                        type="number"
-                        value={item.quantity}
-                        onChange={(e) =>
-                          updateOutputQuantity(item.localId, e.target.value)
-                        }
-                        onKeyDown={(e) => handleQuantityKeyDown(e, item.localId)}
-                        placeholder="0"
-                        style={inputStyle(currentTheme)}
-                      />
-                    </label>
+                      <label style={{ display: "grid", gap: 6, width: 96 }}>
+                        <span style={{ fontSize: 13, color: currentTheme.textSoft }}>
+                          Quantité
+                        </span>
+                        <input
+                          ref={(el) => {
+                            quantityRefs.current[item.localId] = el;
+
+                            if (outputItems[0]?.localId === item.localId) {
+                              firstQuantityRef.current = el;
+                            }
+                          }}
+                          type="number"
+                          value={item.quantity}
+                          onChange={(e) =>
+                            updateOutputQuantity(item.localId, e.target.value)
+                          }
+                          onKeyDown={(e) => handleQuantityKeyDown(e, item.localId)}
+                          placeholder="0"
+                          style={{
+                            ...inputStyle(currentTheme),
+                            width: 75,
+                            textAlign: "center",
+                          }}
+                        />
+                      </label>
+                    </div>
                   </div>
                 </div>
               ))
@@ -1277,14 +1340,13 @@ export default function SortiePage() {
               </button>
 
               <button
-                onClick={() =>
-                  alert(
-                    `Faire signer : ${
-                      finalModal.personName || "Nom non renseigné"
-                    }`
-                  )
-                }
-                style={buttonGhostStyle(currentTheme)}
+                type="button"
+                disabled={!finalModal.personName.trim()}
+                style={{
+                  ...buttonGhostStyle(currentTheme),
+                  opacity: finalModal.personName.trim() ? 1 : 0.5,
+                  cursor: finalModal.personName.trim() ? "pointer" : "not-allowed",
+                }}
               >
                 Faire signer
               </button>

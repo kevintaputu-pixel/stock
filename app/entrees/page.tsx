@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { jsPDF } from "jspdf";
 
@@ -61,6 +61,11 @@ type ReceiptModalState = {
   open: boolean;
   receptionDate: string;
   bc: string;
+};
+
+type PdfConfirmModalState = {
+  open: boolean;
+  selected: "oui" | "non";
 };
 
 const themes: Record<
@@ -164,6 +169,15 @@ export default function EntreesPage() {
     receptionDate: new Date().toISOString().slice(0, 10),
     bc: "",
   });
+  const [pdfConfirmModal, setPdfConfirmModal] = useState<PdfConfirmModalState>({
+    open: false,
+    selected: "non",
+  });
+
+  const quantityRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const bcInputRef = useRef<HTMLInputElement | null>(null);
+  const saveOnlyButtonRef = useRef<HTMLButtonElement | null>(null);
+  const pdfConfirmNoButtonRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
     const savedTheme = localStorage.getItem("stock-theme");
@@ -182,6 +196,44 @@ export default function EntreesPage() {
   useEffect(() => {
     loadProducts();
   }, []);
+
+  useEffect(() => {
+    quantityRefs.current = quantityRefs.current.slice(0, entryItems.length);
+  }, [entryItems.length]);
+
+  useEffect(() => {
+    if (entryItems.length === 0 || receiptModal.open) return;
+
+    const hasFilledQuantity = entryItems.some((item) => item.quantity.trim() !== "");
+    if (hasFilledQuantity) return;
+
+    const timer = window.setTimeout(() => {
+      quantityRefs.current[0]?.focus();
+      quantityRefs.current[0]?.select();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [entryItems, receiptModal.open]);
+
+  useEffect(() => {
+    if (!receiptModal.open || pdfConfirmModal.open) return;
+
+    const timer = window.setTimeout(() => {
+      saveOnlyButtonRef.current?.focus();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [receiptModal.open, pdfConfirmModal.open]);
+
+  useEffect(() => {
+    if (!pdfConfirmModal.open) return;
+
+    const timer = window.setTimeout(() => {
+      pdfConfirmNoButtonRef.current?.focus();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [pdfConfirmModal.open]);
 
   async function loadProducts() {
     setLoading(true);
@@ -427,19 +479,49 @@ export default function EntreesPage() {
 
   function validateEntryItemsBeforeSave() {
     if (entryItems.length === 0) {
-      alert("Ajoute au moins un article.");
       return false;
     }
 
-    for (const item of entryItems) {
+    for (let index = 0; index < entryItems.length; index += 1) {
+      const item = entryItems[index];
       const qty = Number(item.quantity.replace(",", "."));
       if (!Number.isFinite(qty) || qty <= 0) {
-        alert(`Quantité invalide pour : ${item.designation || item.ref_mag}`);
+        window.setTimeout(() => {
+          quantityRefs.current[index]?.focus();
+          quantityRefs.current[index]?.select();
+        }, 0);
         return false;
       }
     }
 
     return true;
+  }
+
+  function handleQuantityEnter(localId: string) {
+    const currentIndex = entryItems.findIndex((item) => item.localId === localId);
+    if (currentIndex === -1) return;
+
+    const currentItem = entryItems[currentIndex];
+    const qty = Number(currentItem.quantity.replace(",", "."));
+
+    if (!Number.isFinite(qty) || qty <= 0) {
+      window.setTimeout(() => {
+        quantityRefs.current[currentIndex]?.focus();
+        quantityRefs.current[currentIndex]?.select();
+      }, 0);
+      return;
+    }
+
+    const nextIndex = currentIndex + 1;
+    if (nextIndex < entryItems.length) {
+      window.setTimeout(() => {
+        quantityRefs.current[nextIndex]?.focus();
+        quantityRefs.current[nextIndex]?.select();
+      }, 0);
+      return;
+    }
+
+    openReceiptModal();
   }
 
   function openReceiptModal() {
@@ -449,6 +531,31 @@ export default function EntreesPage() {
       ...prev,
       open: true,
     }));
+  }
+
+  function askBeforeSaveWithoutPdf() {
+    if (!validateEntryItemsBeforeSave()) return;
+
+    setPdfConfirmModal({
+      open: true,
+      selected: "non",
+    });
+  }
+
+  async function confirmSaveWithoutPdf() {
+    if (pdfConfirmModal.selected === "non") {
+      setPdfConfirmModal({
+        open: false,
+        selected: "non",
+      });
+      await saveEntriesOnly();
+      return;
+    }
+
+    setPdfConfirmModal({
+      open: false,
+      selected: "non",
+    });
   }
 
   async function saveEntriesOnly() {
@@ -545,6 +652,10 @@ export default function EntreesPage() {
         open: false,
         receptionDate: new Date().toISOString().slice(0, 10),
         bc: "",
+      });
+      setPdfConfirmModal({
+        open: false,
+        selected: "non",
       });
       await loadProducts();
     } catch (error: any) {
@@ -765,7 +876,7 @@ export default function EntreesPage() {
                 un nouvel article.
               </div>
             ) : (
-              entryItems.map((item) => (
+              entryItems.map((item, index) => (
                 <div
                   key={item.localId}
                   style={{
@@ -844,13 +955,25 @@ export default function EntreesPage() {
                         Quantité
                       </span>
                       <input
+                        ref={(el) => {
+                          quantityRefs.current[index] = el;
+                        }}
                         type="number"
                         value={item.quantity}
                         onChange={(e) =>
                           updateEntryQuantity(item.localId, e.target.value)
                         }
-                        placeholder="0"
-                        style={inputStyle(currentTheme)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            handleQuantityEnter(item.localId);
+                          }
+                        }}
+                        placeholder="0" 
+                        style={{...inputStyle(currentTheme),
+                        width: 100, // 👈 change la taille ici
+                        textAlign: "center",
+                        }}
                       />
                     </label>
                   </div>
@@ -1020,6 +1143,20 @@ export default function EntreesPage() {
         >
           <div
             onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                e.preventDefault();
+                if (pdfConfirmModal.open) return;
+                setReceiptModal((prev) => ({ ...prev, open: false }));
+                return;
+              }
+
+              if (e.key === "Enter" && !pdfConfirmModal.open) {
+                e.preventDefault();
+                askBeforeSaveWithoutPdf();
+              }
+            }}
+            tabIndex={-1}
             style={{
               width: "100%",
               maxWidth: 1050,
@@ -1219,7 +1356,10 @@ export default function EntreesPage() {
       )}
       {receiptModal.open && (
         <div
-          onClick={() => !saving && setReceiptModal((prev) => ({ ...prev, open: false }))}
+          onClick={() => {
+            if (saving || pdfConfirmModal.open) return;
+            setReceiptModal((prev) => ({ ...prev, open: false }));
+          }}
           style={{
             position: "fixed",
             inset: 0,
@@ -1265,7 +1405,10 @@ export default function EntreesPage() {
               </div>
 
               <button
-                onClick={() => setReceiptModal((prev) => ({ ...prev, open: false }))}
+                onClick={() => {
+                  if (pdfConfirmModal.open) return;
+                  setReceiptModal((prev) => ({ ...prev, open: false }));
+                }}
                 style={buttonLinkStyle(currentTheme)}
               >
                 Fermer
@@ -1302,6 +1445,7 @@ export default function EntreesPage() {
                   BC
                 </span>
                 <input
+                  ref={bcInputRef}
                   type="text"
                   value={receiptModal.bc}
                   onChange={(e) =>
@@ -1310,7 +1454,6 @@ export default function EntreesPage() {
                       bc: e.target.value,
                     }))
                   }
-                  
                   style={inputStyle(currentTheme)}
                 />
               </label>
@@ -1422,8 +1565,9 @@ export default function EntreesPage() {
               </button>
 
               <button
-                onClick={saveEntriesOnly}
-                disabled={saving}
+                ref={saveOnlyButtonRef}
+                onClick={askBeforeSaveWithoutPdf}
+                disabled={saving || pdfConfirmModal.open}
                 style={{
                   background: currentTheme.accent,
                   color: "#fff",
@@ -1436,6 +1580,159 @@ export default function EntreesPage() {
                 }}
               >
                 {saving ? "Enregistrement..." : "Uniquement Enregistrer l'entrée"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pdfConfirmModal.open && (
+        <div
+          onClick={() =>
+            !saving &&
+            setPdfConfirmModal({
+              open: false,
+              selected: "non",
+            })
+          }
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: currentTheme.overlay,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 20,
+            zIndex: 1300,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => {
+              if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+                e.preventDefault();
+                setPdfConfirmModal((prev) => ({
+                  ...prev,
+                  selected: prev.selected === "non" ? "oui" : "non",
+                }));
+                return;
+              }
+
+              if (e.key === "Escape") {
+                e.preventDefault();
+                setPdfConfirmModal({
+                  open: false,
+                  selected: "non",
+                });
+                return;
+              }
+
+              if (e.key === "Enter") {
+                e.preventDefault();
+                confirmSaveWithoutPdf();
+              }
+            }}
+            style={{
+              width: "100%",
+              maxWidth: 520,
+              background: currentTheme.card,
+              border: `1px solid ${currentTheme.border}`,
+              borderRadius: 24,
+              padding: 20,
+              boxShadow: `0 20px 60px ${currentTheme.shadow}`,
+            }}
+          >
+            <div style={{ fontSize: 23, fontWeight: 900, marginBottom: 8 }}>
+              PDF
+            </div>
+
+            <div
+              style={{
+                color: currentTheme.textSoft,
+                fontSize: 15,
+                lineHeight: 1.6,
+                marginBottom: 18,
+              }}
+            >
+               pas besoin du PDF ?
+            </div>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+                gap: 12,
+              }}
+            >
+              <button
+                onClick={() =>
+                  setPdfConfirmModal({
+                    open: false,
+                    selected: "non",
+                  })
+                }
+                onFocus={() =>
+                  setPdfConfirmModal((prev) => ({
+                    ...prev,
+                    selected: "non",
+                  }))
+                }
+                ref={pdfConfirmNoButtonRef}
+                style={{
+                  background:
+                    pdfConfirmModal.selected === "non"
+                      ? currentTheme.accent
+                      : currentTheme.cardSoft,
+                  color:
+                    pdfConfirmModal.selected === "non"
+                      ? "#fff"
+                      : currentTheme.text,
+                  border:
+                    pdfConfirmModal.selected === "non"
+                      ? "none"
+                      : `1px solid ${currentTheme.border}`,
+                  borderRadius: 14,
+                  padding: "14px 16px",
+                  fontWeight: 900,
+                  cursor: "pointer",
+                }}
+              >
+                Non
+              </button>
+
+              <button
+                onClick={() => {
+                  setPdfConfirmModal({
+                    open: false,
+                    selected: "non",
+                  });
+                }}
+                onFocus={() =>
+                  setPdfConfirmModal((prev) => ({
+                    ...prev,
+                    selected: "oui",
+                  }))
+                }
+                style={{
+                  background:
+                    pdfConfirmModal.selected === "oui"
+                      ? currentTheme.accent
+                      : currentTheme.cardSoft,
+                  color:
+                    pdfConfirmModal.selected === "oui"
+                      ? "#fff"
+                      : currentTheme.text,
+                  border:
+                    pdfConfirmModal.selected === "oui"
+                      ? "none"
+                      : `1px solid ${currentTheme.border}`,
+                  borderRadius: 14,
+                  padding: "14px 16px",
+                  fontWeight: 900,
+                  cursor: "pointer",
+                }}
+              >
+                Oui
               </button>
             </div>
           </div>

@@ -47,6 +47,7 @@ type InventoryItem = {
 
 type FinalModalState = {
   open: boolean;
+  message: string;
 };
 
 type ZoneFilter = {
@@ -232,6 +233,8 @@ export default function InventairePage() {
   const [saving, setSaving] = useState(false);
 
   const countedRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const finalModalRef = useRef<HTMLDivElement | null>(null);
+  const ignoreNextModalEnterRef = useRef(false);
 
   const [search1, setSearch1] = useState("");
   const [search2, setSearch2] = useState("");
@@ -242,6 +245,7 @@ export default function InventairePage() {
 
   const [finalModal, setFinalModal] = useState<FinalModalState>({
     open: false,
+    message: "",
   });
 
   useEffect(() => {
@@ -272,7 +276,6 @@ export default function InventairePage() {
 
     if (productsRes.error) {
       console.error(productsRes.error);
-      alert(productsRes.error.message);
       setLoading(false);
       return;
     }
@@ -330,6 +333,39 @@ export default function InventairePage() {
       return true;
     });
   }, [products, search1, search2, zoneFilter]);
+
+  useEffect(() => {
+    if (!finalModal.open) return;
+
+    const focusTimer = window.setTimeout(() => {
+      finalModalRef.current?.focus();
+    }, 0);
+
+    function handleWindowKeyDown(event: KeyboardEvent) {
+      if (event.key === "Enter") {
+        if (ignoreNextModalEnterRef.current) {
+          ignoreNextModalEnterRef.current = false;
+          event.preventDefault();
+          return;
+        }
+
+        event.preventDefault();
+        if (!saving) {
+          handleValidateInventory();
+        }
+      }
+
+      if (event.key === "Escape" && !saving) {
+        setFinalModal((prev) => ({ ...prev, open: false, message: "" }));
+      }
+    }
+
+    window.addEventListener("keydown", handleWindowKeyDown);
+    return () => {
+      window.clearTimeout(focusTimer);
+      window.removeEventListener("keydown", handleWindowKeyDown);
+    };
+  }, [finalModal.open, saving]);
 
   const currentTheme = themes[theme];
 
@@ -451,13 +487,13 @@ export default function InventairePage() {
       });
 
     if (allFilled) {
-      setFinalModal({ open: true });
+      ignoreNextModalEnterRef.current = true;
+      setFinalModal({ open: true, message: "" });
     }
   }
 
   async function handleValidateInventory() {
     if (inventoryItems.length === 0) {
-      alert("Ajoute au moins un article.");
       return;
     }
 
@@ -465,9 +501,10 @@ export default function InventairePage() {
       const countedQty = parseNumber(item.stock_compte);
 
       if (!Number.isFinite(countedQty) || countedQty < 0) {
-        alert(
-          `Stock compté invalide pour : ${item.designation || item.ref_mag}`
-        );
+        setFinalModal({
+          open: true,
+          message: `Stock compté invalide pour : ${item.designation || item.ref_mag}`,
+        });
         return;
       }
     }
@@ -510,13 +547,15 @@ export default function InventairePage() {
         if (movementError) throw movementError;
       }
 
-      alert("Inventaire enregistré.");
       setInventoryItems([]);
-      setFinalModal({ open: false });
+      setFinalModal({ open: false, message: "" });
       await loadAll();
     } catch (error: any) {
       console.error(error);
-      alert(error.message || "Erreur pendant l'enregistrement.");
+      setFinalModal({
+        open: true,
+        message: error.message || "Erreur pendant l'enregistrement.",
+      });
     } finally {
       setSaving(false);
     }
@@ -649,7 +688,7 @@ export default function InventairePage() {
 
             <button
               onClick={() => {
-                setFinalModal({ open: true });
+                setFinalModal({ open: true, message: "" });
               }}
               disabled={saving || inventoryItems.length === 0}
               style={{
@@ -1226,7 +1265,7 @@ export default function InventairePage() {
 
       {finalModal.open && (
         <div
-          onClick={() => setFinalModal({ open: false })}
+          onClick={() => setFinalModal({ open: false, message: "" })}
           style={{
             position: "fixed",
             inset: 0,
@@ -1239,7 +1278,28 @@ export default function InventairePage() {
           }}
         >
           <div
+            ref={finalModalRef}
+            tabIndex={-1}
             onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                if (ignoreNextModalEnterRef.current) {
+                  ignoreNextModalEnterRef.current = false;
+                  e.preventDefault();
+                  return;
+                }
+
+                e.preventDefault();
+                if (!saving) {
+                  handleValidateInventory();
+                }
+              }
+
+              if (e.key === "Escape" && !saving) {
+                e.preventDefault();
+                setFinalModal({ open: false, message: "" });
+              }
+            }}
             style={{
               width: "100%",
               maxWidth: 560,
@@ -1248,6 +1308,7 @@ export default function InventairePage() {
               borderRadius: 24,
               padding: 20,
               boxShadow: `0 20px 60px ${currentTheme.shadow}`,
+              outline: "none",
             }}
           >
             <div style={{ fontSize: 24, fontWeight: 900, marginBottom: 10 }}>
@@ -1262,8 +1323,25 @@ export default function InventairePage() {
                 lineHeight: 1.6,
               }}
             >
-              Tous les articles ont été remplis. Valider l’inventaire ?
+              Tous les articles ont été remplis. Appuie sur Entrée pour valider directement.
             </div>
+
+            {finalModal.message ? (
+              <div
+                style={{
+                  marginBottom: 18,
+                  padding: "12px 14px",
+                  borderRadius: 14,
+                  background: currentTheme.cardSoft,
+                  border: `1px solid ${currentTheme.border}`,
+                  color: currentTheme.danger,
+                  fontSize: 13,
+                  fontWeight: 700,
+                }}
+              >
+                {finalModal.message}
+              </div>
+            ) : null}
 
             <div
               style={{
@@ -1290,7 +1368,7 @@ export default function InventairePage() {
               </button>
 
               <button
-                onClick={() => setFinalModal({ open: false })}
+                onClick={() => setFinalModal({ open: false, message: "" })}
                 style={buttonGhostStyle(currentTheme)}
               >
                 Annuler

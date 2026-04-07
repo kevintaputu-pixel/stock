@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
 
 type ThemeName = "dark" | "green" | "tropical" | "whiteBlue";
@@ -47,7 +47,7 @@ const themes = {
   whiteBlue: {
     bg: "#eff5ff",
     bg2: "#e6efff",
-    glass: "rgba(255,255,255,0.65)",
+    glass: "rgba(255,255,255,0.72)",
     border: "#cfe0ff",
     text: "#0f172a",
     textSoft: "#5b6b89",
@@ -74,20 +74,30 @@ type AccessRequestResponse = {
   status?: string;
 };
 
+const HOME_ACCESS_KEY = "access:/";
+
 export default function HomePage() {
   const [theme, setTheme] = useState<ThemeName>("whiteBlue");
   const [regularizeCount, setRegularizeCount] = useState(0);
   const [codes, setCodes] = useState<string[]>([]);
+
+  const [authChecked, setAuthChecked] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
   const [codeModalOpen, setCodeModalOpen] = useState(false);
   const [forgotModalOpen, setForgotModalOpen] = useState(false);
+
   const [codeInput, setCodeInput] = useState("");
   const [showCode, setShowCode] = useState(false);
-  const [codeTarget, setCodeTarget] = useState<"/donnees" | "/regularisation" | null>(null);
+
+  const [codeTarget, setCodeTarget] = useState<"/" | "/donnees" | "/regularisation" | null>(null);
   const [requestId, setRequestId] = useState<string | null>(null);
   const [requestingForgotCode, setRequestingForgotCode] = useState(false);
   const [requestStatusText, setRequestStatusText] = useState("");
 
   const router = useRouter();
+  const codeInputRef = useRef<HTMLInputElement | null>(null);
+  const forgotOkButtonRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
     const savedTheme = localStorage.getItem("stock-theme");
@@ -99,9 +109,39 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
-    loadRegularizeCount();
     loadCodes();
+    loadRegularizeCount();
+
+    const hasHomeAccess = localStorage.getItem(HOME_ACCESS_KEY) === "true";
+    setIsAuthenticated(hasHomeAccess);
+    setAuthChecked(true);
+
+    if (!hasHomeAccess) {
+      setCodeTarget("/");
+      setCodeModalOpen(true);
+    }
   }, []);
+
+  useEffect(() => {
+    if (!codeModalOpen) return;
+
+    const timer = window.setTimeout(() => {
+      codeInputRef.current?.focus();
+      codeInputRef.current?.select();
+    }, 30);
+
+    return () => window.clearTimeout(timer);
+  }, [codeModalOpen]);
+
+  useEffect(() => {
+    if (!forgotModalOpen) return;
+
+    const timer = window.setTimeout(() => {
+      forgotOkButtonRef.current?.focus();
+    }, 30);
+
+    return () => window.clearTimeout(timer);
+  }, [forgotModalOpen]);
 
   useEffect(() => {
     if (!requestId || !codeTarget) return;
@@ -121,6 +161,13 @@ export default function HomePage() {
           setCodeModalOpen(false);
           setRequestId(null);
           setRequestStatusText("");
+
+          if (codeTarget === "/") {
+            localStorage.setItem(HOME_ACCESS_KEY, "true");
+            setIsAuthenticated(true);
+            return;
+          }
+
           router.push(codeTarget);
         }
       } catch (error) {
@@ -148,9 +195,7 @@ export default function HomePage() {
   }
 
   async function loadRegularizeCount() {
-    const { data, error } = await supabase
-      .from("products")
-      .select("sf, inventaire");
+    const { data, error } = await supabase.from("products").select("sf, inventaire");
 
     if (error) {
       console.error(error);
@@ -168,13 +213,19 @@ export default function HomePage() {
   }
 
   function cycleTheme() {
-    const next =
-      themeOrder[(themeOrder.indexOf(theme) + 1) % themeOrder.length];
+    const next = themeOrder[(themeOrder.indexOf(theme) + 1) % themeOrder.length];
     setTheme(next);
     localStorage.setItem("stock-theme", next);
   }
 
-  function openCodeModal(target: "/donnees" | "/regularisation") {
+  function getThemeLabel(value: ThemeName) {
+    if (value === "dark") return "Sombre";
+    if (value === "green") return "Vert";
+    if (value === "tropical") return "Tropical";
+    return "Blanc / Bleu";
+  }
+
+  function openCodeModal(target: "/" | "/donnees" | "/regularisation") {
     setCodeTarget(target);
     setCodeInput("");
     setShowCode(false);
@@ -185,6 +236,7 @@ export default function HomePage() {
 
   function validateCodeAccess() {
     const value = codeInput.trim();
+
     if (!value) {
       alert("Entre le code confidentiel.");
       return;
@@ -197,8 +249,15 @@ export default function HomePage() {
       return;
     }
 
+    setCodeModalOpen(false);
+
+    if (codeTarget === "/") {
+      localStorage.setItem(HOME_ACCESS_KEY, "true");
+      setIsAuthenticated(true);
+      return;
+    }
+
     if (codeTarget) {
-      setCodeModalOpen(false);
       router.push(codeTarget);
     }
   }
@@ -209,13 +268,15 @@ export default function HomePage() {
     try {
       setRequestingForgotCode(true);
 
+      const pageForApi = codeTarget === "/" ? "/accueil" : codeTarget;
+
       const res = await fetch("/api/access-request", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          page: codeTarget,
+          page: pageForApi,
         }),
       });
 
@@ -237,8 +298,25 @@ export default function HomePage() {
     }
   }
 
+  function logoutHomeAccess() {
+    localStorage.removeItem(HOME_ACCESS_KEY);
+    setIsAuthenticated(false);
+    openCodeModal("/");
+  }
+
   const t = themes[theme];
   const hasAlert = regularizeCount > 0;
+
+  if (!authChecked) {
+    return (
+      <main
+        style={{
+          minHeight: "100vh",
+          background: `linear-gradient(135deg, ${t.bg} 0%, ${t.bg2} 100%)`,
+        }}
+      />
+    );
+  }
 
   return (
     <main
@@ -253,77 +331,111 @@ export default function HomePage() {
         padding: 20,
       }}
     >
-      <div style={{ maxWidth: 1200, margin: "0 auto", display: "grid", gap: 20 }}>
-        <section style={glassCard(t, true)}>
-          <div style={{ display: "grid", gridTemplateColumns: "1.2fr 0.8fr", gap: 20 }}>
-            <div>
-              <div style={badgeStyle(t)}>Stock Manager</div>
+      <style jsx global>{`
+        @keyframes kitt-scan {
+          0% { left: 6%; }
+          100% { left: calc(94% - 72px); }
+        }
+      `}</style>
 
-              <h1 style={titleStyle()}>
-                Tableau de stock
-              </h1>
+      {isAuthenticated && (
+        <div style={{ maxWidth: 1200, margin: "0 auto", display: "grid", gap: 20 }}>
+          <section style={glassCard(t, true)}>
+            <div style={{ display: "grid", gridTemplateColumns: "1.2fr 0.8fr", gap: 20 }}>
+              <div>
+                <div style={badgeStyle(t)}>Stock Manager</div>
 
-              <p style={descStyle(t)}>
-                Interface haut de gamme, rapide et agréable pour piloter ton stock,
-                suivre les mouvements et gérer l’inventaire efficacement.
-              </p>
+                <h1 style={titleStyle()}>
+                  Gestion de stock
+                </h1>
 
-              <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
-                <Link href="/products" style={primaryBtn(t)}>Ouvrir</Link>
-                <Link href="/inventaire" style={ghostBtn(t)}>Inventaire</Link>
-                <button onClick={cycleTheme} style={ghostBtn(t)}>Mode</button>
+                <p style={descStyle(t)}>
+                  
+                </p>
+
+                <div style={{ display: "flex", gap: 10, marginTop: 18, flexWrap: "wrap" }}>
+                  <button onClick={cycleTheme} style={ghostBtn(t)}>
+                    Mode : {getThemeLabel(theme)}
+                  </button>
+
+                  <button onClick={logoutHomeAccess} style={ghostBtn(t)}>
+                    Verrouiller le site
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ display: "grid", gap: 16 }}>
+                <button
+                  onClick={() => openCodeModal("/donnees")}
+                  style={{
+                    background: "transparent",
+                    border: "none",
+                    padding: 0,
+                    cursor: "pointer",
+                    textAlign: "left",
+                    color: "inherit",
+                  }}
+                >
+                  <MiniCard
+                    t={t}
+                    title="Données"
+                    text="Gestion des emails, personnes, codes et e-mails admin"
+                  />
+                </button>
+
+                <Link href="/historique" style={{ textDecoration: "none", color: "inherit" }}>
+                  <MiniCard
+                    t={t}
+                    title="Historique des mouvements"
+                    text="Voir tous les mouvements enregistrés"
+                  />
+                </Link>
               </div>
             </div>
+          </section>
 
-            <div style={{ display: "grid", gap: 12 }}>
-              <MiniCard t={t} title="UI Premium" text="Design moderne" />
-              <button
-                onClick={() => openCodeModal("/donnees")}
-                style={{ background: "transparent", border: "none", padding: 0, cursor: "pointer", textAlign: "left" }}
-              >
-                <MiniCard t={t} title="Données" text="Gestion des emails et personnes" />
-              </button>
-              <Link href="/historique" style={{ textDecoration: "none" }}>
-                <MiniCard t={t} title="Historique des Mouvements" text="Voir tous les mouvements" />
-              </Link>
+          <section
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+              gap: 20,
+              alignItems: "stretch",
+            }}
+          >
+            <Card href="/products" t={t} title="Articles" />
+            <Card href="/mouvement" t={t} title="Mouvements" />
+            <Card href="/inventaire" t={t} title="Inventaire" />
+            <Card href="/entrees" t={t} title="Entrées" />
+            <Card href="/sortie" t={t} title="Sortie" />
+            <ActionCard
+              onClick={() => openCodeModal("/regularisation")}
+              t={t}
+              title={hasAlert ? `Régularisation (${regularizeCount})` : "Régularisation"}
+              highlight={hasAlert}
+            />
+          </section>
+
+          <section style={kittPanelStyle(t)}>
+            <div style={kittTrackStyle(t)}>
+              <div style={kittScannerStyle()} />
             </div>
-          </div>
-        </section>
-
-        <section
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(3, 1fr)",
-            gap: 16,
-          }}
-        >
-          <Card href="/products" t={t} title="Articles" />
-          <Card href="/mouvement" t={t} title="Mouvements" />
-          <Card href="/inventaire" t={t} title="Inventaire" />
-          <Card href="/entrees" t={t} title="Entrées" />
-          <Card href="/sortie" t={t} title="Sortie" />
-          <ActionCard
-            onClick={() => openCodeModal("/regularisation")}
-            t={t}
-            title={hasAlert ? `Régularisation (${regularizeCount})` : "Régularisation"}
-            highlight={hasAlert}
-          />
-        </section>
-
-        <section style={glassCard(t)}>
-          <div style={{ fontSize: 22, fontWeight: 900 }}>
-            Base prête pour évoluer
-          </div>
-        </section>
-      </div>
+          </section>
+        </div>
+      )}
 
       {codeModalOpen && (
         <div
-          onClick={() => setCodeModalOpen(false)}
+          onClick={() => {
+            if (codeTarget !== "/") setCodeModalOpen(false);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Escape" && codeTarget !== "/") setCodeModalOpen(false);
+          }}
+          tabIndex={-1}
           style={{
             position: "fixed",
             inset: 0,
-            background: "rgba(0,0,0,0.45)",
+            background: "rgba(0,0,0,0.52)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -335,16 +447,43 @@ export default function HomePage() {
             onClick={(e) => e.stopPropagation()}
             style={{
               width: "100%",
-              maxWidth: 460,
-              ...glassCard(t),
-              borderRadius: 24,
+              maxWidth: 520,
+              background: t.glass,
+              backdropFilter: "blur(18px)",
+              border: `1px solid ${t.border}`,
+              borderRadius: 26,
+              padding: 26,
+              boxShadow: `0 20px 50px ${t.glow}`,
             }}
           >
-            <div style={{ fontSize: 24, fontWeight: 900, marginBottom: 8 }}>
-              Code confidentiel
+            <div
+              style={{
+                color: t.textSoft,
+                fontSize: 13,
+                marginBottom: 8,
+                fontWeight: 700,
+                letterSpacing: "0.04em",
+                textTransform: "uppercase",
+              }}
+            >
+              Authentification
             </div>
-            <div style={{ fontSize: 14, color: t.textSoft, marginBottom: 16 }}>
-              Entre le code confidentiel pour accéder à cette page.
+
+            <div style={{ fontSize: 32, fontWeight: 900, marginBottom: 10 }}>
+              {codeTarget === "/" ? "Accès sécurisé" : "Code confidentiel"}
+            </div>
+
+            <div
+              style={{
+                fontSize: 14,
+                color: t.textSoft,
+                marginBottom: 18,
+                lineHeight: 1.6,
+              }}
+            >
+              {codeTarget === "/"
+                ? "Entre le code pour accéder à la page d’accueil."
+                : "Entre le code confidentiel pour accéder à cette page."}
             </div>
 
             <div
@@ -357,6 +496,7 @@ export default function HomePage() {
               }}
             >
               <input
+                ref={codeInputRef}
                 type={showCode ? "text" : "password"}
                 value={codeInput}
                 onChange={(e) => setCodeInput(e.target.value)}
@@ -364,30 +504,15 @@ export default function HomePage() {
                   if (e.key === "Enter") validateCodeAccess();
                 }}
                 placeholder="Saisir le code"
-                style={{
-                  width: "100%",
-                  background: t.glass,
-                  border: `1px solid ${t.border}`,
-                  color: t.text,
-                  padding: "14px 16px",
-                  borderRadius: 14,
-                  outline: "none",
-                  fontSize: 15,
-                }}
+                style={inputStyle(t)}
               />
 
               <button
-                onClick={() => setShowCode((prev) => !prev)}
-                style={{
-                  background: t.glass,
-                  border: `1px solid ${t.border}`,
-                  color: t.text,
-                  width: 48,
-                  height: 48,
-                  borderRadius: 14,
-                  cursor: "pointer",
-                  fontSize: 18,
+                onClick={() => {
+                  setShowCode((prev) => !prev);
+                  window.setTimeout(() => codeInputRef.current?.focus(), 0);
                 }}
+                style={iconButtonStyle(t)}
                 title={showCode ? "Masquer le code" : "Afficher le code"}
               >
                 {showCode ? "🙈" : "👁️"}
@@ -412,9 +537,11 @@ export default function HomePage() {
             </button>
 
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, flexWrap: "wrap" }}>
-              <button onClick={() => setCodeModalOpen(false)} style={ghostBtn(t)}>
-                Annuler
-              </button>
+              {codeTarget !== "/" && (
+                <button onClick={() => setCodeModalOpen(false)} style={ghostBtn(t)}>
+                  Annuler
+                </button>
+              )}
               <button onClick={validateCodeAccess} style={primaryBtn(t)}>
                 Valider
               </button>
@@ -426,6 +553,14 @@ export default function HomePage() {
       {forgotModalOpen && (
         <div
           onClick={() => setForgotModalOpen(false)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              setForgotModalOpen(false);
+            }
+            if (e.key === "Escape") setForgotModalOpen(false);
+          }}
+          tabIndex={-1}
           style={{
             position: "fixed",
             inset: 0,
@@ -442,8 +577,12 @@ export default function HomePage() {
             style={{
               width: "100%",
               maxWidth: 460,
-              ...glassCard(t),
+              background: t.glass,
+              backdropFilter: "blur(18px)",
+              border: `1px solid ${t.border}`,
               borderRadius: 24,
+              padding: 24,
+              boxShadow: `0 20px 50px ${t.glow}`,
             }}
           >
             <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 10 }}>
@@ -453,7 +592,11 @@ export default function HomePage() {
               {requestStatusText || "Une demande sera envoyée par e-mail."}
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end" }}>
-              <button onClick={() => setForgotModalOpen(false)} style={primaryBtn(t)}>
+              <button
+                ref={forgotOkButtonRef}
+                onClick={() => setForgotModalOpen(false)}
+                style={primaryBtn(t)}
+              >
                 OK
               </button>
             </div>
@@ -493,6 +636,7 @@ function titleStyle(): React.CSSProperties {
     fontSize: 42,
     fontWeight: 900,
     margin: 0,
+    letterSpacing: "-0.02em",
   };
 }
 
@@ -501,6 +645,8 @@ function descStyle(t: any): React.CSSProperties {
     marginTop: 12,
     fontSize: 15,
     color: t.textSoft,
+    maxWidth: 680,
+    lineHeight: 1.7,
   };
 }
 
@@ -529,18 +675,102 @@ function ghostBtn(t: any): React.CSSProperties {
   };
 }
 
+function inputStyle(t: any): React.CSSProperties {
+  return {
+    width: "100%",
+    background: t.glass,
+    border: `1px solid ${t.border}`,
+    color: t.text,
+    padding: "14px 16px",
+    borderRadius: 14,
+    outline: "none",
+    fontSize: 15,
+  };
+}
+
+function iconButtonStyle(t: any): React.CSSProperties {
+  return {
+    background: t.glass,
+    border: `1px solid ${t.border}`,
+    color: t.text,
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    cursor: "pointer",
+    fontSize: 18,
+  };
+}
+
+function kittPanelStyle(t: any): React.CSSProperties {
+  return {
+    ...glassCard(t),
+    position: "relative",
+    overflow: "hidden",
+    minHeight: 76,
+    padding: "14px 18px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  };
+}
+
+function kittTrackStyle(t: any): React.CSSProperties {
+  return {
+    position: "relative",
+    width: "100%",
+    height: 16,
+    borderRadius: 999,
+    background: "linear-gradient(90deg, rgba(255,255,255,0.03), rgba(255,255,255,0.10), rgba(255,255,255,0.03))",
+    border: `1px solid ${t.border}`,
+    overflow: "hidden",
+    boxShadow: "inset 0 0 18px rgba(0,0,0,0.22)",
+  };
+}
+
+function kittScannerStyle(): React.CSSProperties {
+  return {
+    position: "absolute",
+    top: 1,
+    left: "6%",
+    width: 72,
+    height: 12,
+    borderRadius: 999,
+    background:
+      "linear-gradient(90deg, rgba(255,255,255,0), rgba(255,120,120,0.92), rgba(255,36,36,1), rgba(255,120,120,0.92), rgba(255,255,255,0))",
+    boxShadow:
+      "0 0 10px rgba(255,0,0,0.88), 0 0 22px rgba(255,0,0,0.55), 0 0 34px rgba(255,0,0,0.28)",
+    animation: "kitt-scan 1.6s ease-in-out infinite alternate",
+  };
+}
+
 function MiniCard({ t, title, text }: any) {
   return (
-    <div style={glassCard(t)}>
-      <div style={{ fontWeight: 900 }}>{title}</div>
-      <div style={{ fontSize: 13, color: t.textSoft }}>{text}</div>
+    <div
+      style={{
+        ...glassCard(t),
+        minHeight: 104,
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+      }}
+    >
+      <div style={{ fontWeight: 900, fontSize: 18, color: t.text }}>{title}</div>
+      <div style={{ fontSize: 13, color: t.textSoft, marginTop: 6 }}>{text}</div>
     </div>
   );
 }
 
 function Card({ href, t, title, highlight = false }: any) {
   return (
-    <Link href={href} style={{ textDecoration: "none" }}>
+    <Link
+      href={href}
+      style={{
+        textDecoration: "none",
+        display: "block",
+        width: "100%",
+        color: "inherit",
+      }}
+    >
       <div
         style={{
           ...glassCard(t),
@@ -549,10 +779,13 @@ function Card({ href, t, title, highlight = false }: any) {
           justifyContent: "center",
           fontWeight: 900,
           fontSize: 18,
-          height: 110,
+          minHeight: 120,
+          width: "100%",
+          boxSizing: "border-box",
           background: highlight ? "rgba(220,38,38,0.18)" : t.glass,
           border: highlight ? "1px solid rgba(220,38,38,0.38)" : `1px solid ${t.border}`,
           boxShadow: highlight ? "0 20px 50px rgba(220,38,38,0.24)" : `0 20px 50px ${t.glow}`,
+          color: t.text,
         }}
       >
         {title}
@@ -571,6 +804,8 @@ function ActionCard({ onClick, t, title, highlight = false }: any) {
         padding: 0,
         cursor: "pointer",
         textAlign: "left",
+        width: "100%",
+        display: "block",
       }}
     >
       <div
@@ -581,8 +816,9 @@ function ActionCard({ onClick, t, title, highlight = false }: any) {
           justifyContent: "center",
           fontWeight: 900,
           fontSize: 18,
-          height: 110,
+          minHeight: 120,
           width: "100%",
+          boxSizing: "border-box",
           background: highlight ? "rgba(220,38,38,0.18)" : t.glass,
           border: highlight ? "1px solid rgba(220,38,38,0.38)" : `1px solid ${t.border}`,
           boxShadow: highlight ? "0 20px 50px rgba(220,38,38,0.24)" : `0 20px 50px ${t.glow}`,
