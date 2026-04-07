@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { jsPDF } from "jspdf";
 
 type Product = {
   id: string;
@@ -52,7 +54,10 @@ type OutputItem = {
 type FinalModalState = {
   open: boolean;
   personName: string;
+  sortieDate: string;
 };
+
+type SignatureRequestStatus = "idle" | "sending" | "pending" | "signed" | "error";
 
 const themes: Record<
   ThemeName,
@@ -164,7 +169,14 @@ export default function SortiePage() {
   const [finalModal, setFinalModal] = useState<FinalModalState>({
     open: false,
     personName: "",
+    sortieDate: new Date().toISOString().slice(0, 10),
   });
+  const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
+  const [signatureStatus, setSignatureStatus] = useState<SignatureRequestStatus>("idle");
+  const [signatureRequestToken, setSignatureRequestToken] = useState<string | null>(null);
+  const [signatureSignedAt, setSignatureSignedAt] = useState<string | null>(null);
+  const [signatureMessage, setSignatureMessage] = useState<string>("");
+  const router = useRouter();
 
   const quantityRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const firstQuantityRef = useRef<HTMLInputElement | null>(null);
@@ -197,6 +209,40 @@ export default function SortiePage() {
   useEffect(() => {
     loadProducts();
   }, []);
+
+  useEffect(() => {
+    if (!signatureRequestToken || signatureStatus !== "pending") return;
+
+    let cancelled = false;
+
+    const poll = async () => {
+      try {
+        const response = await fetch(`/api/signature-request?token=${encodeURIComponent(signatureRequestToken)}`, {
+          cache: "no-store",
+        });
+        const json = await response.json();
+
+        if (!response.ok || cancelled) return;
+
+        if (json.status === "signed") {
+          setSignatureStatus("signed");
+          setSignatureDataUrl(json.signature_data_url || null);
+          setSignatureSignedAt(json.signed_at || null);
+          setSignatureMessage("Signature reçue depuis le téléphone.");
+        }
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
+    poll();
+    const interval = window.setInterval(poll, 3000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [signatureRequestToken, signatureStatus]);
 
   useEffect(() => {
     const previousLength = previousOutputLengthRef.current;
@@ -449,8 +495,7 @@ export default function SortiePage() {
       });
 
     if (allFilled) {
-      setFinalModal({ open: true, personName: "" });
-      focusFinalPersonInput();
+      openFinalModal();
     }
   }
 
@@ -533,7 +578,11 @@ export default function SortiePage() {
       }
 
       setOutputItems([]);
-      setFinalModal({ open: false, personName: "" });
+      setFinalModal({
+        open: false,
+        personName: "",
+        sortieDate: new Date().toISOString().slice(0, 10),
+      });
       await loadProducts();
     } catch (error: any) {
       console.error(error);
@@ -541,6 +590,191 @@ export default function SortiePage() {
     } finally {
       setSaving(false);
     }
+  }
+
+
+  function formatDateForPdf(value: string) {
+    if (!value) return "-";
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return value;
+    return d.toLocaleDateString("fr-FR");
+  }
+
+  function validateOutputItemsBeforePdf() {
+    if (outputItems.length === 0) {
+      alert("Ajoute au moins un article.");
+      return false;
+    }
+
+    for (const item of outputItems) {
+      const qty = Number(item.quantity.replace(",", "."));
+      const stockActuel = Number(item.stock_actuel.replace(",", "."));
+
+      if (!Number.isFinite(qty) || qty <= 0) {
+        alert(`Quantité invalide pour : ${item.designation || item.ref_mag}`);
+        return false;
+      }
+
+      if (qty > stockActuel) {
+        alert(`Stock insuffisant pour : ${item.designation || item.ref_mag}`);
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  function openFinalModal() {
+    setFinalModal((prev) => ({
+      open: true,
+      personName: prev.personName || "",
+      sortieDate: prev.sortieDate || new Date().toISOString().slice(0, 10),
+    }));
+    focusFinalPersonInput();
+  }
+
+  async function downloadSortiePdf() {
+    if (!validateOutputItemsBeforePdf()) return;
+
+    const doc = new jsPDF({
+      orientation: "portrait",
+      unit: "mm",
+      format: "a4",
+    });
+
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    let y = 16;
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
+    doc.text("Bon de sortie - Sorties stock", 14, y);
+    y += 10;
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(11);
+    doc.text(`Date de sortie : ${formatDateForPdf(finalModal.sortieDate)}`, 14, y);
+    y += 7;
+    doc.text(`Demandeur : ${finalModal.personName.trim() || "-"}`, 14, y);
+    y += 10;
+
+    doc.setFillColor(239, 246, 255);
+    doc.setDrawColor(210, 220, 240);
+    doc.rect(14, y, pageWidth - 28, 10, "FD");
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.text("Réf.", 16, y + 6.5);
+    doc.text("Désignation", 38, y + 6.5);
+    doc.text("Fournisseur", 105, y + 6.5);
+    doc.text("Qté", 175, y + 6.5);
+    y += 10;
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9.5);
+
+    for (const item of outputItems) {
+      const qty = item.quantity || "0";
+      const rowHeight = 10;
+
+      if (y + rowHeight > pageHeight - 50) {
+        doc.addPage();
+        y = 16;
+      }
+
+      doc.rect(14, y, pageWidth - 28, rowHeight);
+      doc.text(item.ref_mag || "-", 16, y + 6.5, { maxWidth: 18 });
+      doc.text(item.designation || "-", 38, y + 6.5, { maxWidth: 62 });
+      doc.text(item.fournisseur || "-", 105, y + 6.5, { maxWidth: 58 });
+      doc.text(String(qty), 175, y + 6.5, { maxWidth: 20 });
+      y += rowHeight;
+    }
+
+    y += 12;
+
+    if (y + 45 > pageHeight) {
+      doc.addPage();
+      y = 20;
+    }
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.text("Signature Magasinier", 20, y);
+    doc.text("Signature Demandeur", 120, y);
+    y += 4;
+
+    doc.rect(20, y, 65, 28);
+    doc.rect(120, y, 65, 28);
+
+    if (signatureDataUrl) {
+      try {
+        doc.addImage(signatureDataUrl, "PNG", 122, y + 2, 61, 20, undefined, "FAST");
+      } catch (error) {
+        console.error(error);
+      }
+    }
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    doc.text(finalModal.personName.trim() || "-", 122, y + 25);
+    doc.text(`Date : ${formatDateForPdf(finalModal.sortieDate)}`, 122, y + 28.5);
+
+    const safeDate = formatDateForPdf(finalModal.sortieDate).replace(/\//g, "-");
+    const fileName = `Sorties-${safeDate}.pdf`;
+    doc.save(fileName);
+  }
+
+
+  async function sendSignatureLink() {
+    if (!finalModal.personName.trim()) {
+      alert("Renseigne d'abord le demandeur.");
+      return;
+    }
+
+    if (!validateOutputItemsBeforePdf()) return;
+
+    try {
+      setSignatureStatus("sending");
+      setSignatureMessage("");
+
+      const response = await fetch("/api/signature-request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          demandeur: finalModal.personName.trim(),
+          sortieDate: finalModal.sortieDate,
+          items: outputItems.map((item) => ({
+            ref_mag: item.ref_mag || "-",
+            designation: item.designation || "-",
+            fournisseur: item.fournisseur || "-",
+            quantity: item.quantity || "0",
+          })),
+        }),
+      });
+
+      const json = await response.json();
+
+      if (!response.ok) {
+        throw new Error(json?.error || "Impossible d'envoyer l'email de signature.");
+      }
+
+      setSignatureRequestToken(json.token || null);
+      setSignatureStatus("pending");
+      setSignatureDataUrl(null);
+      setSignatureSignedAt(null);
+      setSignatureMessage("Mail envoyé à l'email admin. Ouvre-le sur ton téléphone pour signer.");
+      alert("Mail de signature envoyé à l'email admin.");
+    } catch (error: any) {
+      console.error(error);
+      setSignatureStatus("error");
+      setSignatureMessage(error?.message || "Impossible d'envoyer le lien de signature.");
+      alert(error?.message || "Impossible d'envoyer le lien de signature.");
+    }
+  }
+
+  function openSignaturePageLocally() {
+    if (!signatureRequestToken) return;
+    router.push(`/signature?token=${encodeURIComponent(signatureRequestToken)}`);
   }
 
   function openFavoritesModal(group: FavoritesGroup) {
@@ -655,8 +889,8 @@ export default function SortiePage() {
           Tableau
         </Link>
 
-        <button style={buttonGhostStyle(currentTheme)}>Faire signer</button>
-        <button style={buttonGhostStyle(currentTheme)}>PDF</button>
+        <button onClick={sendSignatureLink} style={buttonGhostStyle(currentTheme)}>Signature ajoutée</button>
+        <button onClick={openFinalModal} style={buttonGhostStyle(currentTheme)}>PDF</button>
 
         <button
           onClick={() => openFavoritesModal("epi")}
@@ -733,8 +967,7 @@ export default function SortiePage() {
 
             <button
               onClick={() => {
-                setFinalModal({ open: true, personName: "" });
-                focusFinalPersonInput();
+                openFinalModal();
               }}
               disabled={saving || outputItems.length === 0}
               style={{
@@ -1071,6 +1304,7 @@ export default function SortiePage() {
               boxShadow: `0 20px 60px ${currentTheme.shadow}`,
             }}
           >
+
             <div
               style={{
                 display: "flex",
@@ -1258,9 +1492,13 @@ export default function SortiePage() {
         </div>
       )}
 
+
+
       {finalModal.open && (
         <div
-          onClick={() => setFinalModal({ open: false, personName: "" })}
+          onClick={() =>
+            setFinalModal((prev) => ({ ...prev, open: false }))
+          }
           style={{
             position: "fixed",
             inset: 0,
@@ -1315,6 +1553,37 @@ export default function SortiePage() {
               </datalist>
             </label>
 
+            <label style={{ display: "grid", gap: 6, marginBottom: 18 }}>
+              <span style={{ fontSize: 13, color: currentTheme.textSoft }}>
+                Date de sortie
+              </span>
+
+              <input
+                type="date"
+                value={finalModal.sortieDate}
+                onChange={(e) =>
+                  setFinalModal((prev) => ({
+                    ...prev,
+                    sortieDate: e.target.value,
+                  }))
+                }
+                style={inputStyle(currentTheme)}
+              />
+            </label>
+
+            <div
+              style={{
+                marginBottom: 14,
+                fontSize: 13,
+                color: currentTheme.textSoft,
+                lineHeight: 1.6,
+              }}
+            >
+              Signature : {signatureStatus === "signed" ? "reçue et ajoutée au PDF" : signatureStatus === "pending" ? "mail envoyé, en attente de signature" : signatureDataUrl ? "ajoutée au PDF" : "non ajoutée"}
+              {signatureMessage ? <><br />{signatureMessage}</> : null}
+              {signatureSignedAt ? <><br />Signée le : {new Date(signatureSignedAt).toLocaleString("fr-FR")}</> : null}
+            </div>
+
             <div
               style={{
                 display: "flex",
@@ -1341,6 +1610,7 @@ export default function SortiePage() {
 
               <button
                 type="button"
+                onClick={downloadSortiePdf}
                 disabled={!finalModal.personName.trim()}
                 style={{
                   ...buttonGhostStyle(currentTheme),
@@ -1348,11 +1618,36 @@ export default function SortiePage() {
                   cursor: finalModal.personName.trim() ? "pointer" : "not-allowed",
                 }}
               >
-                Faire signer
+                Télécharger PDF
               </button>
 
               <button
-                onClick={() => setFinalModal({ open: false, personName: "" })}
+                type="button"
+                onClick={sendSignatureLink}
+                disabled={!finalModal.personName.trim() || signatureStatus === "sending"}
+                style={{
+                  ...buttonGhostStyle(currentTheme),
+                  opacity: finalModal.personName.trim() ? 1 : 0.5,
+                  cursor: finalModal.personName.trim() ? "pointer" : "not-allowed",
+                }}
+              >
+                {signatureStatus === "sending" ? "Envoi..." : signatureStatus === "pending" ? "Mail envoyé" : signatureStatus === "signed" ? "Signature reçue" : "Signature ajoutée"}
+              </button>
+
+              {signatureRequestToken && signatureStatus !== "signed" && (
+                <button
+                  type="button"
+                  onClick={openSignaturePageLocally}
+                  style={buttonGhostStyle(currentTheme)}
+                >
+                  Ouvrir le lien
+                </button>
+              )}
+
+              <button
+                onClick={() =>
+                  setFinalModal((prev) => ({ ...prev, open: false }))
+                }
                 style={buttonGhostStyle(currentTheme)}
               >
                 Fermer
