@@ -8,6 +8,16 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY || ""
 );
 
+function getBaseUrl(request: Request) {
+  const envUrl = process.env.NEXT_PUBLIC_APP_URL?.trim();
+
+  if (envUrl) {
+    return envUrl.replace(/\/+$/, "");
+  }
+
+  return new URL(request.url).origin.replace(/\/+$/, "");
+}
+
 export async function POST(request: Request) {
   try {
     console.log("POST ACCESS REQUEST START");
@@ -28,6 +38,14 @@ export async function POST(request: Request) {
       throw new Error("RESEND_API_KEY manquante");
     }
 
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+      throw new Error("NEXT_PUBLIC_SUPABASE_URL manquante");
+    }
+
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      throw new Error("SUPABASE_SERVICE_ROLE_KEY manquante");
+    }
+
     const { data: requestRow, error: requestError } = await supabaseAdmin
       .from("access_requests")
       .insert({
@@ -45,11 +63,10 @@ export async function POST(request: Request) {
       );
     }
 
-    const baseUrl =
-      process.env.NEXT_PUBLIC_APP_URL ||
-      new URL(request.url).origin;
-
+    const baseUrl = getBaseUrl(request);
     const approveUrl = `${baseUrl}/api/access-request?id=${requestRow.id}&approve=1`;
+
+    console.log("APPROVE URL =", approveUrl);
 
     const result = await resend.emails.send({
       from: process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev",
@@ -64,6 +81,9 @@ export async function POST(request: Request) {
             <a href="${approveUrl}" style="display:inline-block;padding:12px 16px;background:#2563eb;color:#fff;text-decoration:none;border-radius:8px;">
               Valider l'accès
             </a>
+          </p>
+          <p style="margin-top:16px;font-size:12px;color:#666;">
+            Lien direct : ${approveUrl}
           </p>
         </div>
       `,
@@ -123,6 +143,7 @@ export async function GET(request: Request) {
         .eq("id", id);
 
       if (error) {
+        console.error("SUPABASE APPROVE ERROR =", error);
         return new Response("Impossible de valider la demande.", {
           status: 500,
         });
@@ -149,7 +170,8 @@ export async function GET(request: Request) {
 
     return Response.json({ ok: true, status: data.status });
   } catch (error) {
-    console.error(error);
+    console.error("GET ACCESS REQUEST ERROR =", error);
+
     return Response.json(
       { ok: false, message: "Erreur serveur." },
       { status: 500 }
