@@ -4,6 +4,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
+export const dynamic = "force-dynamic";
+
 type RequestPayload = {
   demandeur: string;
   sortie_date: string;
@@ -11,7 +13,7 @@ type RequestPayload = {
   signature_data_url?: string | null;
 };
 
-export const dynamic = "force-dynamic";
+
 
 export default function SignaturePage() {
   const searchParams = useSearchParams();
