@@ -97,7 +97,7 @@ export default function HomePage() {
   const [requestStatusText, setRequestStatusText] = useState("");
 
   const router = useRouter();
-  useAccessRealtime(
+useAccessRealtime(
   requestId,
   codeTarget || "/",
   () => {
@@ -113,13 +113,19 @@ export default function HomePage() {
     }
 
     if (codeTarget) {
-      router.push(codeTarget);
+      localStorage.setItem(`access:${codeTarget}`, "true");
+      window.location.href = codeTarget;
     }
   },
   () => {
-    setRequestStatusText("❌ Demande refusée");
+    setRequestStatusText("Refusé");
   }
 );
+
+  () => {
+    setRequestStatusText("❌ Demande refusée");
+  }
+
   const codeInputRef = useRef<HTMLInputElement | null>(null);
   const forgotOkButtonRef = useRef<HTMLButtonElement | null>(null);
 

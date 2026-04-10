@@ -25,7 +25,9 @@ export function useAccessRealtime(
 
           if (status === "approved") {
             localStorage.setItem(`access:${page}`, "true");
-            onApproved && onApproved();
+           if (onApproved) {
+  onApproved();
+}
           }
 
           if (status === "refused") {
