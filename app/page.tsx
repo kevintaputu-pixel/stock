@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
+import { useAccessRealtime } from "@/lib/useAccessRealtime";
 
 type ThemeName = "dark" | "green" | "tropical" | "whiteBlue";
 
@@ -96,8 +97,33 @@ export default function HomePage() {
   const [requestStatusText, setRequestStatusText] = useState("");
 
   const router = useRouter();
+  useAccessRealtime(
+  requestId,
+  codeTarget || "/",
+  () => {
+    setForgotModalOpen(false);
+    setCodeModalOpen(false);
+    setRequestId(null);
+    setRequestStatusText("");
+
+    if (codeTarget === "/") {
+      localStorage.setItem(HOME_ACCESS_KEY, "true");
+      setIsAuthenticated(true);
+      return;
+    }
+
+    if (codeTarget) {
+      router.push(codeTarget);
+    }
+  },
+  () => {
+    setRequestStatusText("❌ Demande refusée");
+  }
+);
   const codeInputRef = useRef<HTMLInputElement | null>(null);
   const forgotOkButtonRef = useRef<HTMLButtonElement | null>(null);
+
+  
 
   useEffect(() => {
     const savedTheme = localStorage.getItem("stock-theme");
@@ -142,41 +168,6 @@ export default function HomePage() {
 
     return () => window.clearTimeout(timer);
   }, [forgotModalOpen]);
-
-  useEffect(() => {
-    if (!requestId || !codeTarget) return;
-
-    const interval = setInterval(async () => {
-      try {
-        const res = await fetch(`/api/access-request?id=${encodeURIComponent(requestId)}`, {
-          method: "GET",
-          cache: "no-store",
-        });
-
-        const json = (await res.json()) as AccessRequestResponse;
-
-        if (json.status === "approved") {
-          clearInterval(interval);
-          setForgotModalOpen(false);
-          setCodeModalOpen(false);
-          setRequestId(null);
-          setRequestStatusText("");
-
-          if (codeTarget === "/") {
-            localStorage.setItem(HOME_ACCESS_KEY, "true");
-            setIsAuthenticated(true);
-            return;
-          }
-
-          router.push(codeTarget);
-        }
-      } catch (error) {
-        console.error(error);
-      }
-    }, 5000);
-
-    return () => clearInterval(interval);
-  }, [requestId, codeTarget, router]);
 
   async function loadCodes() {
     const { data, error } = await supabase
