@@ -8,7 +8,7 @@ const supabaseAdmin = createClient(
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const page = typeof body.page === "string" ? body.page.trim() : "";
+    const page = typeof body.page === "string" ? body.page : "";
 
     if (!page) {
       return Response.json(
@@ -25,7 +25,7 @@ export async function POST(request: Request) {
       throw new Error("SUPABASE_SERVICE_ROLE_KEY manquante");
     }
 
-    const { data: requestRow, error: requestError } = await supabaseAdmin
+    const { data: requestRow, error } = await supabaseAdmin
       .from("access_requests")
       .insert({
         page,
@@ -34,8 +34,7 @@ export async function POST(request: Request) {
       .select("id")
       .single();
 
-    if (requestError || !requestRow) {
-      console.error("SUPABASE INSERT ERROR =", requestError);
+    if (error || !requestRow) {
       return Response.json(
         { ok: false, message: "Impossible de créer la demande." },
         { status: 500 }
@@ -48,13 +47,8 @@ export async function POST(request: Request) {
       message: "Demande créée.",
     });
   } catch (error: any) {
-    console.error("POST ACCESS REQUEST ERROR =", error);
-
     return Response.json(
-      {
-        ok: false,
-        message: error.message || "Erreur serveur.",
-      },
+      { ok: false, message: error.message || "Erreur serveur." },
       { status: 500 }
     );
   }
@@ -83,7 +77,6 @@ export async function GET(request: Request) {
         .eq("id", id);
 
       if (error) {
-        console.error("SUPABASE APPROVE ERROR =", error);
         return new Response("Impossible de valider la demande.", {
           status: 500,
         });
@@ -109,9 +102,7 @@ export async function GET(request: Request) {
     }
 
     return Response.json({ ok: true, status: data.status });
-  } catch (error) {
-    console.error("GET ACCESS REQUEST ERROR =", error);
-
+  } catch {
     return Response.json(
       { ok: false, message: "Erreur serveur." },
       { status: 500 }
