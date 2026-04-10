@@ -249,6 +249,7 @@ export default function ProductsPage() {
   const [editingProduct, setEditingProduct] = useState<EditableProduct | null>(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [deletingAll, setDeletingAll] = useState(false);
 
   const topScrollRef = useRef<HTMLDivElement | null>(null);
   const tableScrollRef = useRef<HTMLDivElement | null>(null);
@@ -621,6 +622,30 @@ export default function ProductsPage() {
     await loadProducts();
   }
 
+  async function handleDeleteAllProducts() {
+    if (products.length === 0) {
+      openNotice("Suppression", "Aucun article à supprimer.");
+      return;
+    }
+
+    const confirmed = window.confirm("Supprimer tous les articles présents sur cette page ?");
+    if (!confirmed) return;
+
+    setDeletingAll(true);
+    const { error } = await supabase.from("products").delete().not("id", "is", null);
+    if (error) {
+      console.error(error);
+      openNotice("Erreur", error.message);
+      setDeletingAll(false);
+      return;
+    }
+
+    setDeletingAll(false);
+    setEditingProduct(null);
+    openNotice("Suppression terminée", "Tous les articles ont été supprimés avec succès.");
+    await loadProducts();
+  }
+
   function rowToSearchableText(product: Product) {
     return [
       product.categorie,
@@ -966,7 +991,28 @@ export default function ProductsPage() {
   return (
     <main style={{ height: "100vh", background: currentTheme.bg, color: currentTheme.text, padding: 20, display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <div style={{ flexShrink: 0 }}>
-        <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 12, marginBottom: 18, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 18, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            <button
+              onClick={handleDeleteAllProducts}
+              disabled={deletingAll || loading || products.length === 0}
+              style={{
+                background: currentTheme.danger,
+                color: "#fff",
+                border: "none",
+                padding: "11px 16px",
+                borderRadius: 12,
+                fontWeight: 800,
+                cursor: deletingAll || loading || products.length === 0 ? "not-allowed" : "pointer",
+                opacity: deletingAll || loading || products.length === 0 ? 0.65 : 1,
+                boxShadow: `0 10px 30px ${currentTheme.shadow}`,
+              }}
+            >
+              {deletingAll ? "Suppression..." : "Supprimer tous les articles"}
+            </button>
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
           <Link href="/" style={{ textDecoration: "none", background: currentTheme.cardSoft, color: currentTheme.text, border: `1px solid ${currentTheme.border}`, padding: "11px 16px", borderRadius: 12, fontWeight: 700, boxShadow: `0 10px 30px ${currentTheme.shadow}`, cursor: "pointer" }}>
             Page d’accueil
           </Link>
@@ -995,6 +1041,7 @@ export default function ProductsPage() {
             <button onClick={cycleTheme} style={{ background: currentTheme.accent, color: "#ffffff", border: "none", padding: "11px 16px", borderRadius: 12, fontWeight: 800, cursor: "pointer" }}>
               Mode : {getThemeLabel(theme)}
             </button>
+          </div>
           </div>
         </div>
 

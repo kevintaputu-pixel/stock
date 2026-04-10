@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 
-
 type ThemeName = "dark" | "green" | "tropical" | "whiteBlue";
 
 const themes: Record<
@@ -76,9 +75,15 @@ const themeOrder: ThemeName[] = ["dark", "green", "tropical", "whiteBlue"];
 
 type AppDataRow = {
   id: string;
-  type: "email" | "person" | "code" | "admin_email";
+  type: "email" | "person" | "code";
   value: string;
   created_at: string;
+};
+
+type AdminSettingsRow = {
+  id: string;
+  admin_email: string;
+  updated_at: string;
 };
 
 type ProductRow = {
@@ -94,7 +99,6 @@ export default function DonneesPage() {
   const [savingAdminEmail, setSavingAdminEmail] = useState(false);
   const router = useRouter();
 
-
   const [emailInput, setEmailInput] = useState("");
   const [personInput, setPersonInput] = useState("");
   const [codeInput, setCodeInput] = useState("");
@@ -103,7 +107,7 @@ export default function DonneesPage() {
   const [emails, setEmails] = useState<AppDataRow[]>([]);
   const [persons, setPersons] = useState<AppDataRow[]>([]);
   const [codes, setCodes] = useState<AppDataRow[]>([]);
-  const [adminEmails, setAdminEmails] = useState<AppDataRow[]>([]);
+  const [adminSetting, setAdminSetting] = useState<AdminSettingsRow | null>(null);
   const [suppliers, setSuppliers] = useState<string[]>([]);
 
   useEffect(() => {
@@ -126,14 +130,21 @@ export default function DonneesPage() {
     try {
       setLoading(true);
 
-      const [dataRes, suppliersRes] = await Promise.all([
+      const [dataRes, suppliersRes, adminSettingsRes] = await Promise.all([
         supabase
           .from("app_data")
           .select("id, type, value, created_at")
-          .in("type", ["email", "person", "code", "admin_email"])
+          .in("type", ["email", "person", "code"])
           .order("created_at", { ascending: false }),
 
         supabase.from("products").select("fournisseur"),
+
+        supabase
+          .from("admin_settings")
+          .select("id, admin_email, updated_at")
+          .order("updated_at", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
       ]);
 
       if (dataRes.error) {
@@ -148,13 +159,21 @@ export default function DonneesPage() {
         return;
       }
 
+      if (adminSettingsRes.error) {
+        console.error(adminSettingsRes.error);
+        alert("Erreur lors du chargement de l'e-mail admin.");
+        return;
+      }
+
       const dataRows = (dataRes.data || []) as AppDataRow[];
       const productRows = (suppliersRes.data || []) as ProductRow[];
+      const adminRow = (adminSettingsRes.data as AdminSettingsRow | null) || null;
 
       setEmails(dataRows.filter((row) => row.type === "email"));
       setPersons(dataRows.filter((row) => row.type === "person"));
       setCodes(dataRows.filter((row) => row.type === "code"));
-      setAdminEmails(dataRows.filter((row) => row.type === "admin_email"));
+      setAdminSetting(adminRow);
+      setAdminEmailInput(adminRow?.admin_email || "");
 
       const uniqueSuppliers = Array.from(
         new Set(
@@ -261,9 +280,7 @@ export default function DonneesPage() {
 
     if (!value) return;
 
-    const alreadyExists = codes.some(
-      (item) => item.value.trim() === value
-    );
+    const alreadyExists = codes.some((item) => item.value.trim() === value);
     if (alreadyExists) {
       alert("Ce code existe déjà.");
       return;
@@ -290,42 +307,77 @@ export default function DonneesPage() {
     }
   }
 
-  async function addAdminEmail() {
+  async function saveAdminEmail() {
     const value = adminEmailInput.trim().toLowerCase();
 
-    if (!value) return;
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
-      alert("Adresse e-mail invalide.");
+    if (!value) {
+      alert("Ajoute un e-mail admin.");
       return;
     }
 
-    const alreadyExists = adminEmails.some(
-      (item) => item.value.trim().toLowerCase() === value
-    );
-    if (alreadyExists) {
-      alert("Cet e-mail admin existe déjà.");
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+      alert("Adresse e-mail admin invalide.");
       return;
     }
 
     try {
       setSavingAdminEmail(true);
 
-      const { error } = await supabase.from("app_data").insert({
-        type: "admin_email",
-        value,
-      });
+      if (adminSetting?.id) {
+        const { error } = await supabase
+          .from("admin_settings")
+          .update({
+            admin_email: value,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", adminSetting.id);
 
-      if (error) {
-        console.error(error);
-        alert("Impossible d'enregistrer cet e-mail admin.");
-        return;
+        if (error) {
+          console.error(error);
+          alert("Impossible de mettre à jour l'e-mail admin.");
+          return;
+        }
+      } else {
+        const { error } = await supabase.from("admin_settings").insert({
+          admin_email: value,
+        });
+
+        if (error) {
+          console.error(error);
+          alert("Impossible d'enregistrer l'e-mail admin.");
+          return;
+        }
       }
 
-      setAdminEmailInput("");
       await loadAll();
+      alert("E-mail admin enregistré.");
     } finally {
       setSavingAdminEmail(false);
     }
+  }
+
+  async function clearAdminEmail() {
+    if (!adminSetting?.id) {
+      setAdminEmailInput("");
+      return;
+    }
+
+    const ok = window.confirm("Supprimer l'e-mail admin actuel ?");
+    if (!ok) return;
+
+    const { error } = await supabase
+      .from("admin_settings")
+      .delete()
+      .eq("id", adminSetting.id);
+
+    if (error) {
+      console.error(error);
+      alert("Suppression impossible.");
+      return;
+    }
+
+    setAdminEmailInput("");
+    await loadAll();
   }
 
   async function removeItem(id: string) {
@@ -560,39 +612,45 @@ export default function DonneesPage() {
             <section style={cardStyle(currentTheme)}>
               <div style={sectionLabelStyle(currentTheme)}>E-mail Admin</div>
 
-              <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
+              <div style={{ display: "grid", gap: 10, marginBottom: 16 }}>
                 <input
                   value={adminEmailInput}
                   onChange={(e) => setAdminEmailInput(e.target.value)}
-                  placeholder="Ajouter un e-mail admin"
+                  placeholder="Enregistrer l'e-mail admin"
                   style={inputStyle(currentTheme)}
                 />
-                <button
-                  onClick={addAdminEmail}
-                  disabled={savingAdminEmail}
-                  style={primaryButtonStyle(currentTheme)}
-                >
-                  {savingAdminEmail ? "..." : "Ajouter"}
-                </button>
+
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                  <button
+                    onClick={saveAdminEmail}
+                    disabled={savingAdminEmail}
+                    style={primaryButtonStyle(currentTheme)}
+                  >
+                    {savingAdminEmail ? "..." : adminSetting ? "Mettre à jour" : "Enregistrer"}
+                  </button>
+
+                  <button
+                    onClick={clearAdminEmail}
+                    disabled={savingAdminEmail && !adminSetting}
+                    style={secondaryButtonStyle(currentTheme)}
+                  >
+                    Supprimer
+                  </button>
+                </div>
               </div>
 
               <div style={{ display: "grid", gap: 10 }}>
-                {adminEmails.length === 0 ? (
+                {!adminSetting ? (
                   <div style={emptyStyle(currentTheme)}>
-                    Aucun e-mail admin enregistré
+                    Aucun e-mail admin enregistré dans la table admin_settings
                   </div>
                 ) : (
-                  adminEmails.map((item) => (
-                    <div key={item.id} style={rowStyle(currentTheme)}>
-                      <div style={{ fontWeight: 700 }}>{item.value}</div>
-                      <button
-                        onClick={() => removeItem(item.id)}
-                        style={deleteButtonStyle(currentTheme)}
-                      >
-                        Supprimer
-                      </button>
+                  <div style={rowStyle(currentTheme)}>
+                    <div style={{ fontWeight: 700 }}>{adminSetting.admin_email}</div>
+                    <div style={{ color: currentTheme.textSoft, fontSize: 12 }}>
+                      Source officielle des validations d'accès
                     </div>
-                  ))
+                  </div>
                 )}
               </div>
             </section>
@@ -681,6 +739,22 @@ function primaryButtonStyle(theme: {
     background: theme.accent,
     color: "#fff",
     border: "none",
+    borderRadius: 14,
+    padding: "14px 16px",
+    fontWeight: 800,
+    cursor: "pointer",
+  };
+}
+
+function secondaryButtonStyle(theme: {
+  cardSoft: string;
+  border: string;
+  text: string;
+}): React.CSSProperties {
+  return {
+    background: theme.cardSoft,
+    color: theme.text,
+    border: `1px solid ${theme.border}`,
     borderRadius: 14,
     padding: "14px 16px",
     fontWeight: 800,

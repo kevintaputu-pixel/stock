@@ -8,6 +8,10 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY || ""
 );
 
+type AdminSettingsRow = {
+  admin_email: string;
+};
+
 function getBaseUrl(request: Request) {
   const envUrl = process.env.NEXT_PUBLIC_APP_URL?.trim();
 
@@ -18,30 +22,25 @@ function getBaseUrl(request: Request) {
   return new URL(request.url).origin.replace(/\/+$/, "");
 }
 
-async function getAdminEmails() {
+async function getAdminValidationEmail() {
   const { data, error } = await supabaseAdmin
-    .from("app_data")
-    .select("value")
-    .eq("type", "email")
-    .order("created_at", { ascending: true });
+    .from("admin_settings")
+    .select("admin_email")
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle<AdminSettingsRow>();
 
   if (error) {
-    throw new Error(`Impossible de lire les e-mails admin : ${error.message}`);
+    throw new Error("Impossible de lire l'e-mail admin.");
   }
 
-  const emails = Array.from(
-    new Set(
-      (data || [])
-        .map((row) => (typeof row.value === "string" ? row.value.trim() : ""))
-        .filter((value) => value.length > 0)
-    )
-  );
+  const adminEmail = data?.admin_email?.trim().toLowerCase();
 
-  if (emails.length === 0) {
-    throw new Error("Aucune adresse e-mail admin trouvée dans app_data (type = email).");
+  if (!adminEmail) {
+    throw new Error("Aucun e-mail admin configuré dans admin_settings.");
   }
 
-  return emails;
+  return adminEmail;
 }
 
 export async function POST(request: Request) {
@@ -72,7 +71,7 @@ export async function POST(request: Request) {
       throw new Error("SUPABASE_SERVICE_ROLE_KEY manquante");
     }
 
-    const adminEmails = await getAdminEmails();
+    const adminEmail = await getAdminValidationEmail();
 
     const { data: requestRow, error: requestError } = await supabaseAdmin
       .from("access_requests")
@@ -95,17 +94,17 @@ export async function POST(request: Request) {
     const approveUrl = `${baseUrl}/api/access-request?id=${requestRow.id}&approve=1`;
 
     console.log("APPROVE URL =", approveUrl);
-    console.log("ADMIN EMAILS =", adminEmails);
 
     const result = await resend.emails.send({
       from: process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev",
-      to: adminEmails,
+      to: adminEmail,
       subject: `Demande d'accès : ${page}`,
       html: `
         <div style="font-family: Arial, sans-serif; line-height: 1.6;">
           <h2>Demande d'accès</h2>
           <p>Une demande d'accès a été faite pour la page <b>${page}</b>.</p>
           <p>ID de demande : <b>${requestRow.id}</b></p>
+          <p>E-mail admin destinataire : <b>${adminEmail}</b></p>
           <p>
             <a href="${approveUrl}" style="display:inline-block;padding:12px 16px;background:#2563eb;color:#fff;text-decoration:none;border-radius:8px;">
               Valider l'accès
@@ -134,6 +133,7 @@ export async function POST(request: Request) {
     return Response.json({
       ok: true,
       requestId: requestRow.id,
+      adminEmail,
       message: "Demande envoyée par e-mail.",
     });
   } catch (error: any) {
