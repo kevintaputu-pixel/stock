@@ -32,7 +32,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error }, { status: 500 });
     }
 
-    return NextResponse.json({ id: data.id });
+   return NextResponse.json({
+  ok: true,
+  requestId: data.id,
+});
   } catch (err) {
     return NextResponse.json({ error: "server error" }, { status: 500 });
   }
