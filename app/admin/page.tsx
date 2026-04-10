@@ -3,10 +3,17 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
-export default function AdminPage() {
-  const [requests, setRequests] = useState<any[]>([]);
+type Request = {
+  id: string;
+  page: string;
+  status: string;
+  created_at: string;
+};
 
-  async function load() {
+export default function AdminPage() {
+  const [requests, setRequests] = useState<Request[]>([]);
+
+  async function loadRequests() {
     const { data } = await supabase
       .from("access_requests")
       .select("*")
@@ -24,11 +31,11 @@ export default function AdminPage() {
       })
       .eq("id", id);
 
-    load();
+    loadRequests();
   }
 
   useEffect(() => {
-    load();
+    loadRequests();
   }, []);
 
   return (
@@ -36,13 +43,21 @@ export default function AdminPage() {
       <h1>Validation des accès</h1>
 
       {requests.map((r) => (
-        <div key={r.id} style={{ marginBottom: 10 }}>
-          <div>{r.page}</div>
-          <div>{r.status}</div>
+        <div
+          key={r.id}
+          style={{
+            border: "1px solid #ccc",
+            padding: 10,
+            marginBottom: 10,
+            borderRadius: 10,
+          }}
+        >
+          <div><b>Page :</b> {r.page}</div>
+          <div><b>Status :</b> {r.status}</div>
 
           {r.status === "pending" && (
             <button onClick={() => approve(r.id)}>
-              Valider
+              ✅ Valider
             </button>
           )}
         </div>
