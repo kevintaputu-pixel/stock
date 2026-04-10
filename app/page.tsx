@@ -268,7 +268,7 @@ export default function HomePage() {
     try {
       setRequestingForgotCode(true);
 
-      const pageForApi = codeTarget === "/" ? "/accueil" : codeTarget;
+      const pageForApi = codeTarget;
 
       const res = await fetch("/api/access-request", {
         method: "POST",
@@ -290,6 +290,7 @@ export default function HomePage() {
       setRequestId(json.requestId);
       setRequestStatusText("La demande d'accès a bien été envoyée. En attente de validation.");
       setForgotModalOpen(true);
+      console.log("REQUEST ID =", json.requestId);
     } catch (error) {
       console.error(error);
       alert("Impossible d'envoyer la demande.");
