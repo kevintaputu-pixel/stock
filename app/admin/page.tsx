@@ -73,27 +73,27 @@ export default function AdminPage() {
                 background: "#fff",
               }}
             >
-              <div><b>Page :</b> {item.page}</div>
-              <div><b>Statut :</b> {item.status}</div>
-              <div><b>Date :</b> {new Date(item.created_at).toLocaleString()}</div>
+<div><b>Page :</b> {item.page}</div>
+<div><b>Statut :</b> {item.status}</div>
+<div><b>Date :</b> {new Date(item.created_at).toLocaleString()}</div>
 
-              {item.status === "pending" && (
-                <button
-                  onClick={() => approveRequest(item.id)}
-                  style={{
-                    marginTop: 12,
-                    background: "#2563eb",
-                    color: "#fff",
-                    border: "none",
-                    borderRadius: 10,
-                    padding: "10px 14px",
-                    fontWeight: 700,
-                    cursor: "pointer",
-                  }}
-                >
-                  Valider
-                </button>
-              )}
+{String(item.status || "").trim().toLowerCase() !== "approved" && (
+  <button
+    onClick={() => approveRequest(item.id)}
+    style={{
+      marginTop: 12,
+      background: "#2563eb",
+      color: "#fff",
+      border: "none",
+      borderRadius: 10,
+      padding: "10px 14px",
+      fontWeight: 700,
+      cursor: "pointer",
+    }}
+  >
+    Valider
+  </button>
+)}
             </div>
           ))}
         </div>
