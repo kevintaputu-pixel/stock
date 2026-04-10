@@ -1,66 +1,20 @@
-import { Resend } from "resend";
 import { createClient } from "@supabase/supabase-js";
-
-const resend = new Resend(process.env.RESEND_API_KEY);
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || "",
   process.env.SUPABASE_SERVICE_ROLE_KEY || ""
 );
 
-type AdminSettingsRow = {
-  admin_email: string;
-};
-
-function getBaseUrl(request: Request) {
-  const envUrl = process.env.NEXT_PUBLIC_APP_URL?.trim();
-
-  if (envUrl) {
-    return envUrl.replace(/\/+$/, "");
-  }
-
-  return new URL(request.url).origin.replace(/\/+$/, "");
-}
-
-async function getAdminValidationEmail() {
-  const { data, error } = await supabaseAdmin
-    .from("admin_settings")
-    .select("admin_email")
-    .order("updated_at", { ascending: false })
-    .limit(1)
-    .maybeSingle<AdminSettingsRow>();
-
-  if (error) {
-    throw new Error("Impossible de lire l'e-mail admin.");
-  }
-
-  const adminEmail = data?.admin_email?.trim().toLowerCase();
-
-  if (!adminEmail) {
-    throw new Error("Aucun e-mail admin configuré dans admin_settings.");
-  }
-
-  return adminEmail;
-}
-
 export async function POST(request: Request) {
   try {
-    console.log("POST ACCESS REQUEST START");
-
     const body = await request.json();
-    const page = typeof body.page === "string" ? body.page : "";
-
-    console.log("PAGE =", page);
+    const page = typeof body.page === "string" ? body.page.trim() : "";
 
     if (!page) {
       return Response.json(
         { ok: false, message: "Page manquante." },
         { status: 400 }
       );
-    }
-
-    if (!process.env.RESEND_API_KEY) {
-      throw new Error("RESEND_API_KEY manquante");
     }
 
     if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
@@ -70,8 +24,6 @@ export async function POST(request: Request) {
     if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
       throw new Error("SUPABASE_SERVICE_ROLE_KEY manquante");
     }
-
-    const adminEmail = await getAdminValidationEmail();
 
     const { data: requestRow, error: requestError } = await supabaseAdmin
       .from("access_requests")
@@ -83,49 +35,9 @@ export async function POST(request: Request) {
       .single();
 
     if (requestError || !requestRow) {
-      console.error("SUPABASE INSERT ERROR:", requestError);
+      console.error("SUPABASE INSERT ERROR =", requestError);
       return Response.json(
         { ok: false, message: "Impossible de créer la demande." },
-        { status: 500 }
-      );
-    }
-
-    const baseUrl = getBaseUrl(request);
-    const approveUrl = `${baseUrl}/api/access-request?id=${requestRow.id}&approve=1`;
-
-    console.log("APPROVE URL =", approveUrl);
-
-    const result = await resend.emails.send({
-      from: process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev",
-      to: adminEmail,
-      subject: `Demande d'accès : ${page}`,
-      html: `
-        <div style="font-family: Arial, sans-serif; line-height: 1.6;">
-          <h2>Demande d'accès</h2>
-          <p>Une demande d'accès a été faite pour la page <b>${page}</b>.</p>
-          <p>ID de demande : <b>${requestRow.id}</b></p>
-          <p>E-mail admin destinataire : <b>${adminEmail}</b></p>
-          <p>
-            <a href="${approveUrl}" style="display:inline-block;padding:12px 16px;background:#2563eb;color:#fff;text-decoration:none;border-radius:8px;">
-              Valider l'accès
-            </a>
-          </p>
-          <p style="margin-top:16px;font-size:12px;color:#666;">
-            Lien direct : ${approveUrl}
-          </p>
-        </div>
-      `,
-    });
-
-    console.log("RESEND RESULT =", JSON.stringify(result, null, 2));
-
-    if (result?.error) {
-      console.error("RESEND ERROR =", result.error);
-      return Response.json(
-        {
-          ok: false,
-          message: result.error.message || "Envoi email refusé",
-        },
         { status: 500 }
       );
     }
@@ -133,11 +45,10 @@ export async function POST(request: Request) {
     return Response.json({
       ok: true,
       requestId: requestRow.id,
-      adminEmail,
-      message: "Demande envoyée par e-mail.",
+      message: "Demande créée.",
     });
   } catch (error: any) {
-    console.error("API ERROR =", error);
+    console.error("POST ACCESS REQUEST ERROR =", error);
 
     return Response.json(
       {

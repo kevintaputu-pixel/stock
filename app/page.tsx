@@ -288,7 +288,7 @@ export default function HomePage() {
       }
 
       setRequestId(json.requestId);
-      setRequestStatusText("Une demande a été envoyée par e-mail. En attente de validation.");
+      setRequestStatusText("La demande d'accès a bien été envoyée. En attente de validation.");
       setForgotModalOpen(true);
     } catch (error) {
       console.error(error);
@@ -586,10 +586,10 @@ export default function HomePage() {
             }}
           >
             <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 10 }}>
-              Code oublié
+              Demande d'accès
             </div>
             <div style={{ fontSize: 14, color: t.textSoft, lineHeight: 1.6, marginBottom: 18 }}>
-              {requestStatusText || "Une demande sera envoyée par e-mail."}
+              {requestStatusText || "Une demande d'accès sera envoyée pour validation."}
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end" }}>
               <button
