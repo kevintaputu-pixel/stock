@@ -54,7 +54,7 @@ type OutputItem = {
 type FinalModalState = {
   open: boolean;
   personName: string;
-  sortieDate: string;
+  lieu: string;
 };
 
 type SignatureRequestStatus = "idle" | "sending" | "pending" | "signed" | "error";
@@ -169,7 +169,7 @@ export default function SortiePage() {
   const [finalModal, setFinalModal] = useState<FinalModalState>({
     open: false,
     personName: "",
-    sortieDate: new Date().toISOString().slice(0, 10),
+    lieu: "",
   });
   const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
   const [signatureStatus, setSignatureStatus] = useState<SignatureRequestStatus>("idle");
@@ -572,6 +572,7 @@ export default function SortiePage() {
             intervenant: personNameOverride?.trim() || null,
             entrees: 0,
             date: new Date().toISOString(),
+            lieu: finalModal.lieu.trim() || "",
           });
 
         if (movementError) throw movementError;
@@ -581,7 +582,7 @@ export default function SortiePage() {
       setFinalModal({
         open: false,
         personName: "",
-        sortieDate: new Date().toISOString().slice(0, 10),
+        lieu: "",
       });
       await loadProducts();
     } catch (error: any) {
@@ -628,7 +629,7 @@ export default function SortiePage() {
     setFinalModal((prev) => ({
       open: true,
       personName: prev.personName || "",
-      sortieDate: prev.sortieDate || new Date().toISOString().slice(0, 10),
+      lieu: prev.lieu || "",
     }));
     focusFinalPersonInput();
   }
@@ -653,7 +654,10 @@ export default function SortiePage() {
 
     doc.setFont("helvetica", "normal");
     doc.setFontSize(11);
-    doc.text(`Date de sortie : ${formatDateForPdf(finalModal.sortieDate)}`, 14, y);
+    const todayIso = new Date().toISOString();
+    doc.text(`Date : ${formatDateForPdf(todayIso)}`, 14, y);
+    y += 7;
+    doc.text(`Lieu : ${finalModal.lieu.trim() || "-"}`, 14, y);
     y += 7;
     doc.text(`Demandeur : ${finalModal.personName.trim() || "-"}`, 14, y);
     y += 10;
@@ -665,8 +669,7 @@ export default function SortiePage() {
     doc.setFont("helvetica", "bold");
     doc.setFontSize(10);
     doc.text("Réf.", 16, y + 6.5);
-    doc.text("Désignation", 38, y + 6.5);
-    doc.text("Fournisseur", 105, y + 6.5);
+    doc.text("Désignation", 50, y + 6.5);
     doc.text("Qté", 175, y + 6.5);
     y += 10;
 
@@ -683,9 +686,8 @@ export default function SortiePage() {
       }
 
       doc.rect(14, y, pageWidth - 28, rowHeight);
-      doc.text(item.ref_mag || "-", 16, y + 6.5, { maxWidth: 18 });
-      doc.text(item.designation || "-", 38, y + 6.5, { maxWidth: 62 });
-      doc.text(item.fournisseur || "-", 105, y + 6.5, { maxWidth: 58 });
+      doc.text(item.ref_mag || "-", 16, y + 6.5, { maxWidth: 28 });
+      doc.text(item.designation || "-", 50, y + 6.5, { maxWidth: 115 });
       doc.text(String(qty), 175, y + 6.5, { maxWidth: 20 });
       y += rowHeight;
     }
@@ -717,9 +719,9 @@ export default function SortiePage() {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8.5);
     doc.text(finalModal.personName.trim() || "-", 122, y + 25);
-    doc.text(`Date : ${formatDateForPdf(finalModal.sortieDate)}`, 122, y + 28.5);
+    doc.text(`Date : ${formatDateForPdf(todayIso)}`, 122, y + 28.5);
 
-    const safeDate = formatDateForPdf(finalModal.sortieDate).replace(/\//g, "-");
+    const safeDate = formatDateForPdf(todayIso).replace(/\//g, "-");
     const fileName = `Sorties-${safeDate}.pdf`;
     doc.save(fileName);
   }
@@ -742,11 +744,11 @@ export default function SortiePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           demandeur: finalModal.personName.trim(),
-          sortieDate: finalModal.sortieDate,
+          sortieDate: new Date().toISOString(),
+          lieu: finalModal.lieu.trim() || "",
           items: outputItems.map((item) => ({
             ref_mag: item.ref_mag || "-",
             designation: item.designation || "-",
-            fournisseur: item.fournisseur || "-",
             quantity: item.quantity || "0",
           })),
         }),
@@ -1564,18 +1566,19 @@ export default function SortiePage() {
 
             <label style={{ display: "grid", gap: 6, marginBottom: 18 }}>
               <span style={{ fontSize: 13, color: currentTheme.textSoft }}>
-                Date de sortie
+                Lieu
               </span>
 
               <input
-                type="date"
-                value={finalModal.sortieDate}
+                type="text"
+                value={finalModal.lieu}
                 onChange={(e) =>
                   setFinalModal((prev) => ({
                     ...prev,
-                    sortieDate: e.target.value,
+                    lieu: e.target.value,
                   }))
                 }
+                placeholder="Saisir le lieu"
                 style={inputStyle(currentTheme)}
               />
             </label>
