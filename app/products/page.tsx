@@ -193,6 +193,60 @@ const columns: { key: ColumnKey; label: string; baseWidth: number }[] = [
   { key: "prix_final", label: "Prix final", baseWidth: 130 },
 ];
 
+const PRODUCTS_CACHE_KEY = "stock-products-cache-v1";
+
+function getProductsSelectFields() {
+  return "id,categorie,ref_mag,designation,ref_fournisseur,fournisseur,info,zone,demandeur,si,e,s,sf,inventaire,seuil_alerte,prix,qte_souhaite,date_demande,prix_final,created_at";
+}
+
+function sanitizeProducts(rows: Product[] | null | undefined) {
+  return (rows || []).map((row) => ({
+    ...row,
+    categorie: row.categorie ?? null,
+    ref_mag: row.ref_mag ?? null,
+    designation: row.designation ?? null,
+    ref_fournisseur: row.ref_fournisseur ?? null,
+    fournisseur: row.fournisseur ?? null,
+    info: row.info ?? null,
+    zone: row.zone ?? null,
+    demandeur: row.demandeur ?? null,
+    si: row.si ?? null,
+    e: row.e ?? null,
+    s: row.s ?? null,
+    sf: row.sf ?? null,
+    inventaire: row.inventaire ?? null,
+    seuil_alerte: row.seuil_alerte ?? null,
+    prix: row.prix ?? null,
+    qte_souhaite: row.qte_souhaite ?? null,
+    date_demande: row.date_demande ?? null,
+    prix_final: row.prix_final ?? null,
+    created_at: row.created_at ?? undefined,
+  }));
+}
+
+function readProductsCache() {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(PRODUCTS_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { items?: Product[] } | null;
+    if (!parsed || !Array.isArray(parsed.items)) return null;
+    return sanitizeProducts(parsed.items);
+  } catch {
+    return null;
+  }
+}
+
+function writeProductsCache(rows: Product[]) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(
+      PRODUCTS_CACHE_KEY,
+      JSON.stringify({ savedAt: new Date().toISOString(), items: sanitizeProducts(rows) }),
+    );
+  } catch {}
+}
+
 const excelHeaders = [
   "CATEGORIE",
   "REF_MAG",
@@ -433,7 +487,13 @@ export default function ProductsPage() {
   ]);
 
   useEffect(() => {
-    loadProducts();
+    const cachedProducts = readProductsCache();
+    if (cachedProducts && cachedProducts.length > 0) {
+      setProducts(cachedProducts);
+      setLoading(false);
+    }
+
+    void loadProducts({ showLoader: !cachedProducts || cachedProducts.length === 0 });
   }, []);
 
   useEffect(() => {
@@ -629,22 +689,25 @@ export default function ProductsPage() {
     }
   }
 
-  async function loadProducts() {
-    setLoading(true);
+  async function loadProducts(options?: { showLoader?: boolean }) {
+    const shouldShowLoader = options?.showLoader ?? true;
+    if (shouldShowLoader) setLoading(true);
 
     const { data, error } = await supabase
       .from("products")
-      .select("*")
+      .select(getProductsSelectFields())
       .order("created_at", { ascending: false });
 
     if (error) {
       console.error(error);
-      openNotice("Erreur", error.message);
-      setLoading(false);
+      if (products.length === 0) openNotice("Erreur", error.message);
+      if (shouldShowLoader) setLoading(false);
       return;
     }
 
-    const initialProducts = (data as Product[]) || [];
+    const initialProducts = sanitizeProducts((data as Product[]) || []);
+    setProducts(initialProducts);
+    writeProductsCache(initialProducts);
 
     try {
       await syncProductsWithMovementsByRefMag(
@@ -653,23 +716,27 @@ export default function ProductsPage() {
 
       const { data: refreshedData, error: refreshedError } = await supabase
         .from("products")
-        .select("*")
+        .select(getProductsSelectFields())
         .order("created_at", { ascending: false });
 
       if (refreshedError) {
         console.error(refreshedError);
-        openNotice("Erreur", refreshedError.message);
-        setProducts(initialProducts);
-        setLoading(false);
+        const fallbackProducts = initialProducts;
+        setProducts(fallbackProducts);
+        writeProductsCache(fallbackProducts);
+        if (shouldShowLoader) setLoading(false);
         return;
       }
 
-      setProducts((refreshedData as Product[]) || []);
+      const finalProducts = sanitizeProducts((refreshedData as Product[]) || []);
+      setProducts(finalProducts);
+      writeProductsCache(finalProducts);
     } catch (syncError) {
       console.error(syncError);
       setProducts(initialProducts);
+      writeProductsCache(initialProducts);
     } finally {
-      setLoading(false);
+      if (shouldShowLoader) setLoading(false);
     }
   }
 
