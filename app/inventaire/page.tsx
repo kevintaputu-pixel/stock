@@ -737,8 +737,8 @@ export default function InventairePage() {
                     style={{
                       background: currentTheme.cardSoft,
                       border: `1px solid ${currentTheme.border}`,
-                      borderRadius: 16,
-                      padding: 14,
+                      borderRadius: 14,
+                      padding: 10,
                     }}
                   >
                     <div
@@ -752,13 +752,13 @@ export default function InventairePage() {
                       }}
                     >
                       <div>
-                        <div style={{ fontWeight: 900, fontSize: 16 }}>
+                        <div style={{ fontWeight: 900, fontSize: 15 }}>
                           {item.designation || "-"}
                         </div>
                         <div
                           style={{
-                            marginTop: 4,
-                            fontSize: 13,
+                            marginTop: 3,
+                            fontSize: 12,
                             color: currentTheme.textSoft,
                           }}
                         >
@@ -773,9 +773,10 @@ export default function InventairePage() {
                           background: currentTheme.danger,
                           color: "#fff",
                           border: "none",
-                          borderRadius: 12,
-                          padding: "10px 12px",
+                          borderRadius: 10,
+                          padding: "8px 10px",
                           fontWeight: 800,
+                          fontSize: 12,
                           cursor: "pointer",
                         }}
                       >
@@ -786,16 +787,16 @@ export default function InventairePage() {
                     <div
                       style={{
                         display: "grid",
-                        gridTemplateColumns: "1fr 150px 150px 150px",
-                        gap: 12,
+                        gridTemplateColumns: "minmax(140px, 1fr) minmax(60px, 20px) minmax(80px, 65px) minmax(80px, 95px)",
+                        gap: 26,
                         alignItems: "end",
                       }}
                     >
                       <div
                         style={{
-                          fontSize: 13,
+                          fontSize: 12,
                           color: currentTheme.textSoft,
-                          lineHeight: 1.6,
+                          lineHeight: 1.45,
                         }}
                       >
                         Catégorie : {item.categorie || "-"}
@@ -804,7 +805,7 @@ export default function InventairePage() {
                       </div>
 
                       <label style={{ display: "grid", gap: 6 }}>
-                        <span style={{ fontSize: 13, color: currentTheme.textSoft }}>
+                        <span style={{ fontSize: 12, color: currentTheme.textSoft }}>
                           Stock système
                         </span>
                         <input
@@ -818,7 +819,7 @@ export default function InventairePage() {
                       </label>
 
                       <label style={{ display: "grid", gap: 6 }}>
-                        <span style={{ fontSize: 13, color: currentTheme.textSoft }}>
+                        <span style={{ fontSize: 12, color: currentTheme.textSoft }}>
                           Stock compté
                         </span>
                         <input
@@ -837,7 +838,7 @@ export default function InventairePage() {
                       </label>
 
                       <div style={{ display: "grid", gap: 6 }}>
-                        <span style={{ fontSize: 13, color: currentTheme.textSoft }}>
+                        <span style={{ fontSize: 12, color: currentTheme.textSoft }}>
                           Écart
                         </span>
                         <div
@@ -1427,10 +1428,10 @@ function inputStyle(theme: {
     background: theme.cardSoft,
     color: theme.text,
     border: `1px solid ${theme.border}`,
-    borderRadius: 12,
-    padding: "12px 14px",
+    borderRadius: 8,
+    padding: "6px 8px",
     outline: "none",
-    fontSize: 14,
+    fontSize: 12,
   };
 }
 
@@ -1502,11 +1503,11 @@ function differenceBoxStyle(
     background: theme.cardSoft,
     border: `1px solid ${borderColor}`,
     color,
-    borderRadius: 12,
-    padding: "12px 14px",
-    fontSize: 14,
+    borderRadius: 8,
+    padding: "6px 8px",
+    fontSize: 12,
     fontWeight: 900,
-    minHeight: 44,
+    minHeight: 32,
     display: "flex",
     alignItems: "center",
   };

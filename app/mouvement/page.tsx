@@ -194,21 +194,20 @@ export default function MouvementPage() {
     return "Blanc / Bleu";
   }
 
-  async function loadCodes() {
-    const { data, error } = await supabase
-      .from("app_data")
-      .select("id, type, value, created_at")
-      .eq("type", "code")
-      .order("created_at", { ascending: false });
+async function loadCodes() {
+  const { data, error } = await supabase
+    .from("app_data")
+    .select("id, type, value")
+    .eq("type", "code");
 
-    if (error) {
-      console.error(error);
-      return;
-    }
-
-    const rows = (data as AppDataRow[]) || [];
-    setCodes(rows.map((row) => row.value.trim()).filter(Boolean));
+  if (error) {
+    console.log("LOAD CODES ERROR =", error);
+    return;
   }
+
+  const rows = (data as AppDataRow[]) || [];
+  setCodes(rows.map((row) => (row.value || "").trim()).filter(Boolean));
+}
 
   async function loadData() {
     setLoading(true);
@@ -438,11 +437,11 @@ export default function MouvementPage() {
       }
 
       await syncProductsWithMovements();
-      await loadData();
+      setData([]);
       setPreviewOpen(false);
       setPendingFileName("");
       setPreviewRows([]);
-      setActionMessage(`${payload.length} mouvement(s) importé(s) sans tri ni modification. Les colonnes Entrées / Sorties ont été resynchronisées par REF_MAG.`);
+      setActionMessage(`${payload.length} mouvement(s) importé(s). La page a été vidée après l'import.`);
     } catch (error) {
       console.error("IMPORT VALIDATION ERROR:", error);
       setActionMessage(getReadableErrorMessage(error));
@@ -479,7 +478,29 @@ export default function MouvementPage() {
       XLSX.utils.book_append_sheet(workbook, sheet, "Mouvements");
       XLSX.writeFile(workbook, "mouvements_export.xlsx");
 
-      setActionMessage("Export Excel généré de C2 à O.");
+      const shouldDelete = window.confirm(
+        "Export terminé. Veux-tu supprimer tous les mouvements de cette page ?"
+      );
+
+      if (!shouldDelete) {
+        setActionMessage("Export Excel généré de C2 à O.");
+        return;
+      }
+
+      const { error } = await supabase.from("movements").delete().not("id", "is", null);
+
+      if (error) {
+        console.error(error);
+        setActionMessage("Export terminé, mais impossible de supprimer les mouvements.");
+        return;
+      }
+
+      await syncProductsWithMovements();
+      setData([]);
+      setPreviewOpen(false);
+      setPendingFileName("");
+      setPreviewRows([]);
+      setActionMessage("Export Excel généré puis tous les mouvements ont été supprimés. La page est maintenant vide.");
     } catch (error) {
       console.error("EXPORT EXCEL ERROR:", error);
       setActionMessage(getReadableErrorMessage(error));
@@ -538,23 +559,6 @@ export default function MouvementPage() {
             Supprimé l&apos;historique
           </button>
 
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={importing || exporting}
-            style={{
-              background: currentTheme.accent,
-              color: "#fff",
-              border: "none",
-              padding: "11px 16px",
-              borderRadius: 12,
-              fontWeight: 800,
-              cursor: importing || exporting ? "not-allowed" : "pointer",
-              opacity: importing || exporting ? 0.7 : 1,
-              boxShadow: `0 10px 30px ${currentTheme.shadow}`,
-            }}
-          >
-            {importing ? "Import en cours..." : "Importer"}
-          </button>
 
           <button
             onClick={handleExportFile}

@@ -175,39 +175,48 @@ useAccessRealtime(
     return () => window.clearTimeout(timer);
   }, [forgotModalOpen]);
 
-  async function loadCodes() {
-    const { data, error } = await supabase
-      .from("app_data")
-      .select("id, type, value, created_at")
-      .eq("type", "code")
-      .order("created_at", { ascending: false });
+async function loadCodes() {
+  const { data, error } = await supabase
+    .from("app_data")
+    .select("id, type, value")
+    .eq("type", "code");
 
-    if (error) {
-      console.error(error);
-      return;
-    }
-
-    const rows = (data as AppDataRow[]) || [];
-    setCodes(rows.map((row) => row.value.trim()).filter(Boolean));
+  if (error) {
+    console.log("LOAD CODES ERROR =", error);
+    return;
   }
 
-  async function loadRegularizeCount() {
-    const { data, error } = await supabase.from("products").select("sf, inventaire");
+  const rows = (data as AppDataRow[]) || [];
+  setCodes(rows.map((row) => (row.value || "").trim()).filter(Boolean));
+}
 
-    if (error) {
-      console.error(error);
-      return;
-    }
+async function loadRegularizeCount() {
+  const { data, error } = await supabase
+    .from("products")
+    .select("*"); // ⚠️ on prend tout pour éviter erreur de colonne
 
-    const count = (data || []).filter(
-      (item: any) =>
-        item.inventaire !== null &&
-        item.sf !== null &&
-        item.inventaire !== item.sf
-    ).length;
-
-    setRegularizeCount(count);
+  if (error) {
+    console.log("LOAD REGULARIZE ERROR =", error);
+    return;
   }
+
+  const rows = Array.isArray(data) ? data : [];
+
+  const count = rows.filter((item: any) => {
+    const sf = item?.sf;
+    const inventaire = item?.inventaire;
+
+    return (
+      sf !== null &&
+      sf !== undefined &&
+      inventaire !== null &&
+      inventaire !== undefined &&
+      sf !== inventaire
+    );
+  }).length;
+
+  setRegularizeCount(count);
+}
 
   function cycleTheme() {
     const next = themeOrder[(themeOrder.indexOf(theme) + 1) % themeOrder.length];

@@ -84,10 +84,9 @@ type ColumnKey =
   | "seuil_alerte"
   | "prix"
   | "qte_souhaite"
-  | "date_demande"
   | "prix_final";
 
-type SortableColumnKey = Exclude<ColumnKey, "action">;
+type SortableColumnKey = ColumnKey;
 type SortDirection = "asc" | "desc";
 
 type Theme = {
@@ -174,23 +173,22 @@ const themeOrder: ThemeName[] = ["dark", "green", "tropical", "whiteBlue"];
 const columns: { key: ColumnKey; label: string; baseWidth: number }[] = [
   { key: "action", label: "Action", baseWidth: 140 },
   { key: "categorie", label: "Catégorie", baseWidth: 120 },
-  { key: "ref_mag", label: "Réf. magasin", baseWidth: 120 },
+  { key: "ref_mag", label: "Référence Magasin", baseWidth: 150 },
   { key: "designation", label: "Désignation", baseWidth: 220 },
-  { key: "ref_fournisseur", label: "Réf. fournisseur", baseWidth: 150 },
+  { key: "ref_fournisseur", label: "Référence Fournisseur", baseWidth: 170 },
   { key: "fournisseur", label: "Fournisseur", baseWidth: 150 },
   { key: "info", label: "Info", baseWidth: 150 },
   { key: "zone", label: "Zone", baseWidth: 90 },
   { key: "demandeur", label: "Demandeur", baseWidth: 120 },
-  { key: "si", label: "Stock initial", baseWidth: 110 },
-  { key: "e", label: "Entrées", baseWidth: 90 },
-  { key: "s", label: "Sorties", baseWidth: 90 },
-  { key: "sf", label: "Stock final", baseWidth: 120 },
+  { key: "si", label: "Stock initiale", baseWidth: 120 },
+  { key: "e", label: "Entrée", baseWidth: 90 },
+  { key: "s", label: "Sortie", baseWidth: 90 },
+  { key: "sf", label: "Stock Final", baseWidth: 120 },
   { key: "inventaire", label: "Inventaire", baseWidth: 110 },
-  { key: "seuil_alerte", label: "Seuil d’alerte", baseWidth: 120 },
+  { key: "seuil_alerte", label: "Seuille d'alerte", baseWidth: 130 },
   { key: "prix", label: "Prix unitaire", baseWidth: 120 },
-  { key: "qte_souhaite", label: "Qté souhaitée", baseWidth: 120 },
-  { key: "date_demande", label: "Date demande", baseWidth: 120 },
-  { key: "prix_final", label: "Prix final", baseWidth: 130 },
+  { key: "qte_souhaite", label: "Quantité souhaité pour la commande", baseWidth: 220 },
+  { key: "prix_final", label: "Prix Globale", baseWidth: 130 },
 ];
 
 const PRODUCTS_CACHE_KEY = "stock-products-cache-v1";
@@ -231,10 +229,19 @@ function readProductsCache() {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as { items?: Product[] } | null;
     if (!parsed || !Array.isArray(parsed.items)) return null;
-    return sanitizeProducts(parsed.items);
+    return sortProductsByRefMagAsc(sanitizeProducts(parsed.items));
   } catch {
     return null;
   }
+}
+
+function sortProductsByRefMagAsc(rows: Product[]) {
+  return [...rows].sort((a, b) =>
+    String(a.ref_mag ?? "").localeCompare(String(b.ref_mag ?? ""), "fr", {
+      numeric: true,
+      sensitivity: "base",
+    }),
+  );
 }
 
 function writeProductsCache(rows: Product[]) {
@@ -242,30 +249,29 @@ function writeProductsCache(rows: Product[]) {
   try {
     window.localStorage.setItem(
       PRODUCTS_CACHE_KEY,
-      JSON.stringify({ savedAt: new Date().toISOString(), items: sanitizeProducts(rows) }),
+      JSON.stringify({ savedAt: new Date().toISOString(), items: sortProductsByRefMagAsc(sanitizeProducts(rows)) }),
     );
   } catch {}
 }
 
 const excelHeaders = [
-  "CATEGORIE",
-  "REF_MAG",
-  "DESIGNATION",
-  "REF_FOURNISSEUR",
-  "FOURNISSEUR",
-  "INFO",
-  "ZONE",
-  "DEMANDEUR",
-  "SI",
-  "E",
-  "S",
-  "SF",
-  "INVENTAIRE",
-  "SEUIL_ALERTE",
-  "PRIX",
-  "QTE_SOUHAITE",
-  "DATE_DEMANDE",
-  "PRIX_FINAL",
+  "Catégorie",
+  "Référence Magasin",
+  "Désignation",
+  "Référence Fournisseur",
+  "Fournisseur",
+  "Info",
+  "Zone",
+  "Demandeur",
+  "Stock initiale",
+  "Entrée",
+  "Sortie",
+  "Stock Final",
+  "Inventaire",
+  "Seuille d'alerte",
+  "Prix unitaire",
+  "Quantité souhaité pour la commande",
+  "Prix Globale",
 ];
 
 export default function ProductsPage() {
@@ -312,7 +318,6 @@ export default function ProductsPage() {
     seuil_alerte: false,
     prix: false,
     qte_souhaite: false,
-    date_demande: false,
     prix_final: false,
   });
 
@@ -386,13 +391,13 @@ export default function ProductsPage() {
   }, []);
 
   useEffect(() => {
-    if (!editingProduct) return;
+    if (!editingProduct?.id) return;
     const timer = window.setTimeout(() => {
       editFirstInputRef.current?.focus();
       editFirstInputRef.current?.select();
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [editingProduct]);
+  }, [editingProduct?.id]);
 
   useEffect(() => {
     if (!showNoticeModal) return;
@@ -571,21 +576,20 @@ export default function ProductsPage() {
     return () => window.clearTimeout(timer);
   }, [forgotModalOpen]);
 
-  async function loadCodes() {
-    const { data, error } = await supabase
-      .from("app_data")
-      .select("id, type, value, created_at")
-      .in("type", ["code", "access_code", "admin_code", "delete_products_code"])
-      .order("created_at", { ascending: false });
+async function loadCodes() {
+  const { data, error } = await supabase
+    .from("app_data")
+    .select("id, type, value")
+    .eq("type", "code");
 
-    if (error) {
-      console.error(error);
-      return;
-    }
-
-    const rows = (data as AppDataRow[]) || [];
-    setCodes(rows.map((row) => String(row.value || "").trim()).filter(Boolean));
+  if (error) {
+    console.log("LOAD CODES ERROR =", error);
+    return;
   }
+
+  const rows = (data as AppDataRow[]) || [];
+  setCodes(rows.map((row) => (row.value || "").trim()).filter(Boolean));
+}
 
   async function executeDeleteAllProducts() {
     setDeletingAll(true);
@@ -689,23 +693,28 @@ export default function ProductsPage() {
     }
   }
 
-  async function loadProducts(options?: { showLoader?: boolean }) {
-    const shouldShowLoader = options?.showLoader ?? true;
-    if (shouldShowLoader) setLoading(true);
+async function loadProducts(options?: { showLoader?: boolean }) {
+  const shouldShowLoader = options?.showLoader ?? true;
+  if (shouldShowLoader) setLoading(true);
 
-    const { data, error } = await supabase
-      .from("products")
-      .select(getProductsSelectFields())
-      .order("created_at", { ascending: false });
+  const { data, error } = await supabase
+    .from("products")
+    .select(getProductsSelectFields())
+    .order("ref_mag", { ascending: true });
 
-    if (error) {
-      console.error(error);
-      if (products.length === 0) openNotice("Erreur", error.message);
-      if (shouldShowLoader) setLoading(false);
-      return;
+  if (error) {
+    console.log("LOAD PRODUCTS ERROR =", error);
+    if (products.length === 0) {
+      openNotice(
+        "Erreur",
+        error?.message || error?.details || error?.hint || "Erreur de chargement."
+      );
     }
+    if (shouldShowLoader) setLoading(false);
+    return;
+  }
 
-    const initialProducts = sanitizeProducts((data as Product[]) || []);
+    const initialProducts = sortProductsByRefMagAsc(sanitizeProducts(Array.isArray(data) ? ((data as unknown) as Product[]) : []));
     setProducts(initialProducts);
     writeProductsCache(initialProducts);
 
@@ -717,7 +726,7 @@ export default function ProductsPage() {
       const { data: refreshedData, error: refreshedError } = await supabase
         .from("products")
         .select(getProductsSelectFields())
-        .order("created_at", { ascending: false });
+        .order("ref_mag", { ascending: true });
 
       if (refreshedError) {
         console.error(refreshedError);
@@ -728,7 +737,7 @@ export default function ProductsPage() {
         return;
       }
 
-      const finalProducts = sanitizeProducts((refreshedData as Product[]) || []);
+      const finalProducts = sortProductsByRefMagAsc(sanitizeProducts(Array.isArray(refreshedData) ? ((refreshedData as unknown) as Product[]) : []));
       setProducts(finalProducts);
       writeProductsCache(finalProducts);
     } catch (syncError) {
@@ -1036,6 +1045,41 @@ export default function ProductsPage() {
     openDeleteAuthModal();
   }
 
+
+
+
+  function hasInventoryMismatch(product: Product) {
+    return product.inventaire !== null && product.sf !== null && product.inventaire !== product.sf;
+  }
+
+  function getActionLabel(product: Product) {
+    return hasInventoryMismatch(product) ? "Régul." : "Modifier";
+  }
+
+  function getActionButtonStyle(product: Product): React.CSSProperties {
+    if (hasInventoryMismatch(product)) {
+      return {
+        background: theme === "whiteBlue" ? "#f59e0b" : "#f97316",
+        color: "#fff",
+        border: "none",
+        borderRadius: 10,
+        padding: "8px 12px",
+        fontWeight: 700,
+        cursor: "pointer",
+      };
+    }
+
+    return {
+      background: currentTheme.accent,
+      color: "#fff",
+      border: "none",
+      borderRadius: 10,
+      padding: "8px 12px",
+      fontWeight: 700,
+      cursor: "pointer",
+    };
+  }
+
   function rowToSearchableText(product: Product) {
     return [
       product.categorie,
@@ -1064,6 +1108,8 @@ export default function ProductsPage() {
 
   function getSortableValue(product: Product, column: SortableColumnKey) {
     switch (column) {
+      case "action":
+        return getActionLabel(product);
       case "categorie":
         return product.categorie ?? "";
       case "ref_mag":
@@ -1116,7 +1162,7 @@ export default function ProductsPage() {
   }
 
   function handleSortHeaderClick(column: ColumnKey) {
-    if (!sortEnabled || column === "action") return;
+    if (!sortEnabled) return;
     const sortableColumn = column as SortableColumnKey;
     if (sortColumn !== sortableColumn) {
       setSortColumn(sortableColumn);
@@ -1143,7 +1189,7 @@ export default function ProductsPage() {
   }
 
   function getSortIndicator(column: ColumnKey) {
-    if (column === "action" || !sortEnabled) return "";
+    if (!sortEnabled) return "";
     if (sortColumn !== column) return "";
     return sortDirection === "asc" ? " ▲" : " ▼";
   }
@@ -1168,82 +1214,68 @@ export default function ProductsPage() {
       const XLSX = await import("xlsx");
       const buffer = await file.arrayBuffer();
       const workbook = XLSX.read(buffer, { type: "array", cellDates: false });
-      const firstSheetName = workbook.SheetNames[0];
-      if (!firstSheetName)
-        throw new Error("Le fichier Excel ne contient aucune feuille.");
-      const worksheet = workbook.Sheets[firstSheetName];
-      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(
-        worksheet,
-        { defval: "" },
+      const stockSheetName = workbook.SheetNames.find(
+        (name) => name.trim().toLowerCase() === "stock",
       );
-      if (!rows.length) throw new Error("Le fichier Excel est vide.");
 
-      const firstRowHeaders = Object.keys(rows[0]).map(normalizeHeader);
-      const missingHeaders = excelHeaders.filter(
-        (header) => !firstRowHeaders.includes(normalizeHeader(header)),
-      );
-      if (missingHeaders.length > 0) {
-        throw new Error(`En-têtes manquants : ${missingHeaders.join(", ")}`);
+      if (!stockSheetName) {
+        throw new Error("Aucun onglet Stock trouvé.");
       }
 
-      const parsedRows = rows
+      const worksheet = workbook.Sheets[stockSheetName];
+      const rawRows = XLSX.utils.sheet_to_json<unknown[]>(worksheet, {
+        header: 1,
+        range: 1,
+        defval: "",
+        blankrows: false,
+      });
+
+      const parsedRows = rawRows
         .map((row) => {
-          const normalized: Record<string, unknown> = {};
-          for (const [key, value] of Object.entries(row))
-            normalized[normalizeHeader(key)] = value;
-          const si = normalizeNumber(
-            normalized.SI as string | number | null | undefined,
-          );
-          const e = normalizeNumber(
-            normalized.E as string | number | null | undefined,
-          );
-          const s = normalizeNumber(
-            normalized.S as string | number | null | undefined,
-          );
-          const prix = normalizeNumber(
-            normalized.PRIX as string | number | null | undefined,
-          );
-          const qte = normalizeNumber(
-            normalized.QTESOUHAITE as string | number | null | undefined,
-          );
-          const sfFromFile = normalizeNumber(
-            normalized.SF as string | number | null | undefined,
-          );
-          const prixFinalFromFile = normalizeNumber(
-            normalized.PRIXFINAL as string | number | null | undefined,
-          );
+          const values = Array.isArray(row) ? row : [];
+          const si = normalizeNumber(values[8] as string | number | null | undefined);
+          const e = normalizeNumber(values[9] as string | number | null | undefined);
+          const s = normalizeNumber(values[10] as string | number | null | undefined);
+          const sfFromFile = normalizeNumber(values[11] as string | number | null | undefined);
+          const inventaire = normalizeNumber(values[12] as string | number | null | undefined);
+          const seuilAlerte = normalizeNumber(values[13] as string | number | null | undefined);
+          const prix = normalizeNumber(values[14] as string | number | null | undefined);
+          const qte = normalizeNumber(values[15] as string | number | null | undefined);
+          const prixFinalFromFile = normalizeNumber(values[17] as string | number | null | undefined);
 
           return {
-            categorie: normalizeText(String(normalized.CATEGORIE ?? "")),
-            ref_mag: normalizeText(String(normalized.REFMAG ?? "")),
-            designation: normalizeText(String(normalized.DESIGNATION ?? "")),
-            ref_fournisseur: normalizeText(
-              String(normalized.REFFOURNISSEUR ?? ""),
-            ),
-            fournisseur: normalizeText(String(normalized.FOURNISSEUR ?? "")),
-            info: normalizeText(String(normalized.INFO ?? "")),
-            zone: normalizeText(String(normalized.ZONE ?? "")),
-            demandeur: normalizeText(String(normalized.DEMANDEUR ?? "")),
+            categorie: normalizeText(String(values[0] ?? "")),
+            ref_mag: normalizeText(String(values[1] ?? "")),
+            designation: normalizeText(String(values[2] ?? "")),
+            ref_fournisseur: normalizeText(String(values[3] ?? "")),
+            fournisseur: normalizeText(String(values[4] ?? "")),
+            info: normalizeText(String(values[5] ?? "")),
+            zone: normalizeText(String(values[6] ?? "")),
+            demandeur: normalizeText(String(values[7] ?? "")),
             si,
             e,
             s,
             sf: sfFromFile ?? (si ?? 0) + (e ?? 0) - (s ?? 0),
-            inventaire: normalizeNumber(
-              normalized.INVENTAIRE as string | number | null | undefined,
-            ),
-            seuil_alerte: normalizeNumber(
-              normalized.SEUILALERTE as string | number | null | undefined,
-            ),
+            inventaire,
+            seuil_alerte: seuilAlerte,
             prix,
             qte_souhaite: qte,
-            date_demande: excelDateToISO(normalized.DATEDEMANDE),
+            date_demande: excelDateToISO(values[16]),
             prix_final: prixFinalFromFile ?? (prix ?? 0) * (qte ?? 0),
           };
         })
+        .filter((row) => {
+          return Object.values(row).some((value) => {
+            if (value === null || value === undefined) return false;
+            if (typeof value === "number") return true;
+            return String(value).trim() !== "";
+          });
+        })
         .filter((row) => row.ref_mag || row.designation);
 
-      if (!parsedRows.length)
-        throw new Error("Aucune ligne exploitable trouvée dans le fichier.");
+      if (!parsedRows.length) {
+        throw new Error("Aucune ligne exploitable trouvée dans l'onglet Stock.");
+      }
 
       const refMags = parsedRows
         .map((row) => row.ref_mag)
@@ -1291,9 +1323,7 @@ export default function ProductsPage() {
 
       await syncProductsWithMovementsByRefMag(refMags);
       await loadProducts();
-      setImportMessage(
-        `Import terminé avec succès : ${parsedRows.length} ligne(s) traitée(s). Les entrées et sorties ont été recalculées selon les mouvements liés à la Réf. magasin.`,
-      );
+      setImportMessage(`Import terminé : ${parsedRows.length} ligne(s) traitée(s).`);
     } catch (error) {
       console.error(error);
       setImportMessage(
@@ -1308,29 +1338,29 @@ export default function ProductsPage() {
     setExporting(true);
     try {
       const XLSX = await import("xlsx");
-      const rows = sortedProducts.map((product) => ({
-        CATEGORIE: product.categorie ?? "",
-        REF_MAG: product.ref_mag ?? "",
-        DESIGNATION: product.designation ?? "",
-        REF_FOURNISSEUR: product.ref_fournisseur ?? "",
-        FOURNISSEUR: product.fournisseur ?? "",
-        INFO: product.info ?? "",
-        ZONE: product.zone ?? "",
-        DEMANDEUR: product.demandeur ?? "",
-        SI: product.si ?? "",
-        E: product.e ?? "",
-        S: product.s ?? "",
-        SF: product.sf ?? "",
-        INVENTAIRE: product.inventaire ?? "",
-        SEUIL_ALERTE: product.seuil_alerte ?? "",
-        PRIX: product.prix ?? "",
-        QTE_SOUHAITE: product.qte_souhaite ?? "",
-        DATE_DEMANDE: product.date_demande ?? "",
-        PRIX_FINAL: product.prix_final ?? "",
-      }));
-      const worksheet = XLSX.utils.json_to_sheet(rows, {
-        header: excelHeaders,
-      });
+      const rows = sortedProducts.map((product) => ([
+        product.categorie ?? "",
+        product.ref_mag ?? "",
+        product.designation ?? "",
+        product.ref_fournisseur ?? "",
+        product.fournisseur ?? "",
+        product.info ?? "",
+        product.zone ?? "",
+        product.demandeur ?? "",
+        product.si ?? "",
+        product.e ?? "",
+        product.s ?? "",
+        product.sf ?? "",
+        product.inventaire ?? "",
+        product.seuil_alerte ?? "",
+        product.prix ?? "",
+        product.qte_souhaite ?? "",
+        product.prix_final ?? "",
+      ]));
+      const worksheet = XLSX.utils.aoa_to_sheet([
+        excelHeaders,
+        ...rows,
+      ]);
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, "Stock");
       XLSX.writeFile(
@@ -1379,7 +1409,7 @@ export default function ProductsPage() {
     function getColumnText(product: Product, column: ColumnKey) {
       switch (column) {
         case "action":
-          return "Modifier";
+          return getActionLabel(product);
         case "categorie":
           return product.categorie || "-";
         case "ref_mag":
@@ -1809,7 +1839,7 @@ export default function ProductsPage() {
               sortedProducts.map((product) => (
                 <tr
                   key={product.id}
-                  onDoubleClick={() => openEditModal(product)}
+                  onClick={() => openEditModal(product)}
                   style={{ cursor: "pointer" }}
                 >
                   <td
@@ -1823,17 +1853,9 @@ export default function ProductsPage() {
                         e.stopPropagation();
                         openEditModal(product);
                       }}
-                      style={{
-                        background: currentTheme.accent,
-                        color: "#fff",
-                        border: "none",
-                        borderRadius: 10,
-                        padding: "8px 12px",
-                        fontWeight: 700,
-                        cursor: "pointer",
-                      }}
+                      style={getActionButtonStyle(product)}
                     >
-                      Modifier
+                      {getActionLabel(product)}
                     </button>
                   </td>
                   <td
@@ -2568,27 +2590,6 @@ export default function ProductsPage() {
                 theme={currentTheme}
               />
               <Field
-                label="Stock initial"
-                value={editingProduct.si}
-                onChange={(v) => updateEditingField("si", v)}
-                theme={currentTheme}
-                type="number"
-              />
-              <Field
-                label="Entrées"
-                value={editingProduct.e}
-                onChange={(v) => updateEditingField("e", v)}
-                theme={currentTheme}
-                type="number"
-              />
-              <Field
-                label="Sorties"
-                value={editingProduct.s}
-                onChange={(v) => updateEditingField("s", v)}
-                theme={currentTheme}
-                type="number"
-              />
-              <Field
                 label="Stock final"
                 value={editingProduct.sf}
                 onChange={() => {}}
@@ -2623,13 +2624,6 @@ export default function ProductsPage() {
                 onChange={(v) => updateEditingField("qte_souhaite", v)}
                 theme={currentTheme}
                 type="number"
-              />
-              <Field
-                label="Date demande"
-                value={editingProduct.date_demande}
-                onChange={(v) => updateEditingField("date_demande", v)}
-                theme={currentTheme}
-                type="date"
               />
               <Field
                 label="Prix final"

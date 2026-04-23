@@ -431,19 +431,22 @@ export default function EntreesPage() {
     }
 
     const currentRef = newArticleForm.ref_mag.trim() || nextRefMag;
+    const preservedCategorie = newArticleForm.categorie.trim();
+    const preservedFournisseur = newArticleForm.fournisseur.trim();
+    const preservedDemandeur = newArticleForm.demandeur.trim();
 
     const newItem: EntryItem = {
       localId: crypto.randomUUID(),
       source: "new",
       productId: null,
-      categorie: newArticleForm.categorie.trim(),
+      categorie: preservedCategorie,
       ref_mag: currentRef,
       designation: newArticleForm.designation.trim(),
       ref_fournisseur: newArticleForm.ref_fournisseur.trim(),
-      fournisseur: newArticleForm.fournisseur.trim(),
+      fournisseur: preservedFournisseur,
       info: newArticleForm.info.trim(),
       zone: newArticleForm.zone.trim(),
-      demandeur: newArticleForm.demandeur.trim(),
+      demandeur: preservedDemandeur,
       seuil_alerte: newArticleForm.seuil_alerte.trim(),
       prix: newArticleForm.prix.trim(),
       qte_souhaite: newArticleForm.qte_souhaite.trim(),
@@ -458,14 +461,14 @@ export default function EntreesPage() {
     setNextRefMag(nextRef);
     setNewArticleForm({
       action: "Entrée",
-      categorie: "",
+      categorie: preservedCategorie,
       ref_mag: nextRef,
       designation: "",
       ref_fournisseur: "",
-      fournisseur: "",
+      fournisseur: preservedFournisseur,
       info: "",
       zone: "",
-      demandeur: "",
+      demandeur: preservedDemandeur,
       seuil_alerte: "",
       prix: "",
       qte_souhaite: "",
@@ -673,6 +676,20 @@ export default function EntreesPage() {
     return d.toLocaleDateString("fr-FR");
   }
 
+  function truncatePdfText(doc: jsPDF, value: string, maxWidth: number) {
+    const text = (value || "-").trim() || "-";
+    if (doc.getTextWidth(text) <= maxWidth) return text;
+
+    const ellipsis = "...";
+    let truncated = text;
+
+    while (truncated.length > 0 && doc.getTextWidth(`${truncated}${ellipsis}`) > maxWidth) {
+      truncated = truncated.slice(0, -1);
+    }
+
+    return truncated ? `${truncated}${ellipsis}` : ellipsis;
+  }
+
   async function downloadEntriesPdf() {
     if (!validateEntryItemsBeforeSave()) return;
 
@@ -724,8 +741,8 @@ export default function EntreesPage() {
 
       doc.rect(14, y, pageWidth - 28, rowHeight);
       doc.text(item.ref_mag || "-", 16, y + 6.5, { maxWidth: 18 });
-      doc.text(item.designation || "-", 38, y + 6.5, { maxWidth: 62 });
-      doc.text(item.ref_fournisseur || "-", 105, y + 6.5, { maxWidth: 58 });
+      doc.text(truncatePdfText(doc, item.designation || "-", 62), 38, y + 6.5);
+      doc.text(truncatePdfText(doc, item.ref_fournisseur || "-", 58), 105, y + 6.5);
       doc.text(String(qty), 175, y + 6.5, { maxWidth: 20 });
       y += rowHeight;
     }
