@@ -23,7 +23,6 @@ type Product = {
   seuil_alerte: number | null;
   prix: number | null;
   qte_souhaite: number | null;
-  date_demande: string | null;
   prix_final: number | null;
   created_at?: string;
 };
@@ -62,7 +61,6 @@ type EditableProduct = {
   seuil_alerte: string;
   prix: string;
   qte_souhaite: string;
-  date_demande: string;
   prix_final: string;
 };
 
@@ -84,7 +82,6 @@ type ColumnKey =
   | "seuil_alerte"
   | "prix"
   | "qte_souhaite"
-  | "date_demande"
   | "prix_final";
 
 type SortableColumnKey = ColumnKey;
@@ -195,7 +192,7 @@ const columns: { key: ColumnKey; label: string; baseWidth: number }[] = [
 const PRODUCTS_CACHE_KEY = "stock-products-cache-v1";
 
 function getProductsSelectFields() {
-  return "id,categorie,ref_mag,designation,ref_fournisseur,fournisseur,info,zone,demandeur,si,e,s,sf,inventaire,seuil_alerte,prix,qte_souhaite,date_demande,prix_final,created_at";
+  return "id,categorie,ref_mag,designation,ref_fournisseur,fournisseur,info,zone,demandeur,si,e,s,sf,inventaire,seuil_alerte,prix,qte_souhaite,prix_final,created_at";
 }
 
 function sanitizeProducts(rows: Product[] | null | undefined) {
@@ -217,7 +214,6 @@ function sanitizeProducts(rows: Product[] | null | undefined) {
     seuil_alerte: row.seuil_alerte ?? null,
     prix: row.prix ?? null,
     qte_souhaite: row.qte_souhaite ?? null,
-    date_demande: row.date_demande ?? null,
     prix_final: row.prix_final ?? null,
     created_at: row.created_at ?? undefined,
   }));
@@ -915,20 +911,6 @@ async function loadProducts(options?: { showLoader?: boolean }) {
       .toUpperCase();
   }
 
-  function excelDateToISO(value: unknown) {
-    if (value === null || value === undefined || value === "") return null;
-    if (typeof value === "number") {
-      const jsDate = new Date(Math.round((value - 25569) * 86400 * 1000));
-      return Number.isNaN(jsDate.getTime())
-        ? null
-        : jsDate.toISOString().slice(0, 10);
-    }
-    const text = String(value).trim();
-    if (!text) return null;
-    const date = new Date(text);
-    if (Number.isNaN(date.getTime())) return text;
-    return date.toISOString().slice(0, 10);
-  }
 
   function toEditable(product: Product): EditableProduct {
     return {
@@ -949,7 +931,6 @@ async function loadProducts(options?: { showLoader?: boolean }) {
       seuil_alerte: product.seuil_alerte?.toString() || "",
       prix: product.prix?.toString() || "",
       qte_souhaite: product.qte_souhaite?.toString() || "",
-      date_demande: product.date_demande || "",
       prix_final: product.prix_final?.toString() || "",
     };
   }
@@ -1000,7 +981,6 @@ async function loadProducts(options?: { showLoader?: boolean }) {
       seuil_alerte: normalizeNumber(editingProduct.seuil_alerte),
       prix,
       qte_souhaite: qte,
-      date_demande: editingProduct.date_demande || null,
       prix_final: prixFinal,
     };
     const { error } = await supabase
@@ -1099,7 +1079,6 @@ async function loadProducts(options?: { showLoader?: boolean }) {
       product.seuil_alerte,
       product.prix,
       product.qte_souhaite,
-      product.date_demande,
       product.prix_final,
     ]
       .filter((value) => value !== null && value !== undefined)
@@ -1143,10 +1122,6 @@ async function loadProducts(options?: { showLoader?: boolean }) {
         return product.prix ?? Number.NEGATIVE_INFINITY;
       case "qte_souhaite":
         return product.qte_souhaite ?? Number.NEGATIVE_INFINITY;
-      case "date_demande":
-        return product.date_demande
-          ? new Date(product.date_demande).getTime()
-          : Number.NEGATIVE_INFINITY;
       case "prix_final":
         return product.prix_final ?? Number.NEGATIVE_INFINITY;
       default:
@@ -1242,7 +1217,7 @@ async function loadProducts(options?: { showLoader?: boolean }) {
           const seuilAlerte = normalizeNumber(values[13] as string | number | null | undefined);
           const prix = normalizeNumber(values[14] as string | number | null | undefined);
           const qte = normalizeNumber(values[15] as string | number | null | undefined);
-          const prixFinalFromFile = normalizeNumber(values[17] as string | number | null | undefined);
+          const prixFinalFromFile = normalizeNumber(values[16] as string | number | null | undefined);
 
           return {
             categorie: normalizeText(String(values[0] ?? "")),
@@ -1261,7 +1236,6 @@ async function loadProducts(options?: { showLoader?: boolean }) {
             seuil_alerte: seuilAlerte,
             prix,
             qte_souhaite: qte,
-            date_demande: excelDateToISO(values[16]),
             prix_final: prixFinalFromFile ?? (prix ?? 0) * (qte ?? 0),
           };
         })
@@ -1443,8 +1417,6 @@ async function loadProducts(options?: { showLoader?: boolean }) {
           return formatPrice(product.prix);
         case "qte_souhaite":
           return formatNumber(product.qte_souhaite);
-        case "date_demande":
-          return formatDate(product.date_demande);
         case "prix_final":
           return formatPrice(product.prix_final);
         default:
@@ -1491,7 +1463,6 @@ async function loadProducts(options?: { showLoader?: boolean }) {
       seuil_alerte: nextValue,
       prix: nextValue,
       qte_souhaite: nextValue,
-      date_demande: nextValue,
       prix_final: nextValue,
     });
   }
@@ -1826,13 +1797,13 @@ async function loadProducts(options?: { showLoader?: boolean }) {
           <tbody>
             {loading ? (
               <tr>
-                <td style={tdStyle(currentTheme)} colSpan={19}>
+                <td style={tdStyle(currentTheme)} colSpan={18}>
                   Chargement...
                 </td>
               </tr>
             ) : sortedProducts.length === 0 ? (
               <tr>
-                <td style={tdStyle(currentTheme)} colSpan={19}>
+                <td style={tdStyle(currentTheme)} colSpan={18}>
                   Aucune donnée trouvée
                 </td>
               </tr>
@@ -1997,10 +1968,8 @@ async function loadProducts(options?: { showLoader?: boolean }) {
                   <td
                     style={{
                       ...tdStyle(currentTheme),
-                      ...getColumnStyle("date_demande"),
                     }}
                   >
-                    {formatDate(product.date_demande)}
                   </td>
                   <td
                     style={{
