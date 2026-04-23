@@ -84,6 +84,7 @@ type ColumnKey =
   | "seuil_alerte"
   | "prix"
   | "qte_souhaite"
+  | "date_demande"
   | "prix_final";
 
 type SortableColumnKey = ColumnKey;
