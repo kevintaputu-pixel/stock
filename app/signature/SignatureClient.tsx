@@ -24,6 +24,7 @@ export default function SignaturePage() {
   const [requestData, setRequestData] = useState<RequestPayload | null>(null);
   const [message, setMessage] = useState<string>("");
   const [done, setDone] = useState(false);
+  const [signedComplete, setSignedComplete] = useState(false);
   const [isDrawing, setIsDrawing] = useState(false);
 
   const wrapperRef = useRef<HTMLDivElement | null>(null);
@@ -51,6 +52,7 @@ export default function SignaturePage() {
         setRequestData(json);
         if (json.status === "signed") {
           setDone(true);
+          setSignedComplete(true);
           setMessage("Cette signature a déjà été enregistrée.");
         }
       } catch (error: any) {
@@ -206,13 +208,39 @@ export default function SignaturePage() {
       }
 
       setDone(true);
-      setMessage("Signature enregistrée. Tu peux revenir au PDF sur ton ordinateur.");
+      setSignedComplete(true);
+      setMessage("Signature validée.");
     } catch (error: any) {
       console.error(error);
       alert(error?.message || "Impossible d'enregistrer la signature.");
     } finally {
       setSaving(false);
     }
+  }
+
+  function closePage() {
+    window.close();
+  }
+
+  function goToSortie() {
+    window.location.replace("/sortie?signature=ok");
+  }
+
+  if (signedComplete) {
+    return (
+      <main style={successPage}>
+        <section style={successCard}>
+          <div style={successBadge}>✓</div>
+          <h1 style={successTitle}>Signature validée</h1>
+          <p style={successText}>La signature a bien été enregistrée. Tu peux maintenant quitter cette page ou revenir aux sorties.</p>
+          <div style={successActions}>
+            <button onClick={goToSortie} style={primaryBtn}>Retour aux sorties</button>
+            <button onClick={closePage} style={ghostBtn}>Fermer cette page</button>
+          </div>
+          <p style={successHint}>Si le bouton fermer ne réagit pas sur ton téléphone, utilise simplement le retour de ton navigateur.</p>
+        </section>
+      </main>
+    );
   }
 
   return (
@@ -285,4 +313,70 @@ const primaryBtn: React.CSSProperties = {
   padding: "11px 16px",
   fontWeight: 900,
   cursor: "pointer",
+};
+
+
+const successPage: React.CSSProperties = {
+  minHeight: "100vh",
+  background: "linear-gradient(135deg, #020617 0%, #111827 45%, #064e3b 100%)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: 20,
+};
+
+const successCard: React.CSSProperties = {
+  width: "100%",
+  maxWidth: 560,
+  background: "rgba(255,255,255,0.96)",
+  border: "1px solid rgba(255,255,255,0.55)",
+  borderRadius: 28,
+  boxShadow: "0 28px 80px rgba(0,0,0,0.38)",
+  padding: "34px 26px",
+  textAlign: "center",
+};
+
+const successBadge: React.CSSProperties = {
+  width: 72,
+  height: 72,
+  borderRadius: 999,
+  margin: "0 auto 18px",
+  background: "#10b981",
+  color: "#ffffff",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  fontSize: 40,
+  fontWeight: 900,
+  boxShadow: "0 16px 35px rgba(16,185,129,0.35)",
+};
+
+const successTitle: React.CSSProperties = {
+  margin: 0,
+  color: "#0f172a",
+  fontSize: 30,
+  fontWeight: 950,
+  letterSpacing: -0.5,
+};
+
+const successText: React.CSSProperties = {
+  color: "#475569",
+  fontSize: 16,
+  lineHeight: 1.65,
+  margin: "12px auto 24px",
+  maxWidth: 430,
+};
+
+const successActions: React.CSSProperties = {
+  display: "flex",
+  justifyContent: "center",
+  gap: 12,
+  flexWrap: "wrap",
+};
+
+const successHint: React.CSSProperties = {
+  margin: "20px 0 0",
+  color: "#64748b",
+  fontSize: 13,
+  lineHeight: 1.45,
 };

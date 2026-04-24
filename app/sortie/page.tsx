@@ -176,11 +176,33 @@ export default function SortiePage() {
   const [signatureRequestToken, setSignatureRequestToken] = useState<string | null>(null);
   const [signatureSignedAt, setSignatureSignedAt] = useState<string | null>(null);
   const [signatureMessage, setSignatureMessage] = useState<string>("");
+  const signatureMessageTimerRef = useRef<number | null>(null);
   const router = useRouter();
 
   const quantityRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const firstQuantityRef = useRef<HTMLInputElement | null>(null);
   const previousOutputLengthRef = useRef(0);
+
+
+  useEffect(() => {
+    return () => {
+      if (signatureMessageTimerRef.current) {
+        window.clearTimeout(signatureMessageTimerRef.current);
+      }
+    };
+  }, []);
+
+  function showTemporarySignatureMessage(message: string) {
+    if (signatureMessageTimerRef.current) {
+      window.clearTimeout(signatureMessageTimerRef.current);
+    }
+
+    setSignatureMessage(message);
+    signatureMessageTimerRef.current = window.setTimeout(() => {
+      setSignatureMessage("");
+      signatureMessageTimerRef.current = null;
+    }, 3000);
+  }
 
   useEffect(() => {
     const savedTheme = localStorage.getItem("stock-theme");
@@ -625,7 +647,22 @@ export default function SortiePage() {
     return true;
   }
 
+  function resetSignatureFlow() {
+    setSignatureDataUrl(null);
+    setSignatureStatus("idle");
+    setSignatureRequestToken(null);
+    setSignatureSignedAt(null);
+    setSignatureMessage("");
+
+    if (signatureMessageTimerRef.current) {
+      window.clearTimeout(signatureMessageTimerRef.current);
+      signatureMessageTimerRef.current = null;
+    }
+  }
+
   function openFinalModal() {
+    resetSignatureFlow();
+
     setFinalModal((prev) => ({
       open: true,
       personName: prev.personName || "",
@@ -635,7 +672,7 @@ export default function SortiePage() {
   }
 
   async function downloadSortiePdf() {
-    if (!validateOutputItemsBeforePdf()) return;
+    if (!validateOutputItemsBeforePdf()) return false;
 
     const doc = new jsPDF({
       orientation: "portrait",
@@ -724,6 +761,7 @@ export default function SortiePage() {
     const safeDate = formatDateForPdf(todayIso).replace(/\//g, "-");
     const fileName = `Sorties-${safeDate}.pdf`;
     doc.save(fileName);
+    return true;
   }
 
 
@@ -764,19 +802,30 @@ export default function SortiePage() {
       setSignatureStatus("pending");
       setSignatureDataUrl(null);
       setSignatureSignedAt(null);
-      setSignatureMessage("Mail envoyé à l'email admin. Ouvre-le sur ton téléphone pour signer.");
-      alert("Mail de signature envoyé à l'email admin.");
+      showTemporarySignatureMessage("Mail de signature envoyé à l'admin");
     } catch (error: any) {
       console.error(error);
       setSignatureStatus("error");
       setSignatureMessage(error?.message || "Impossible d'envoyer le lien de signature.");
-      alert(error?.message || "Impossible d'envoyer le lien de signature.");
+      showTemporarySignatureMessage(error?.message || "Impossible d'envoyer le lien de signature.");
     }
   }
 
   function openSignaturePageLocally() {
     if (!signatureRequestToken) return;
     router.push(`/signature?token=${encodeURIComponent(signatureRequestToken)}`);
+  }
+
+  async function downloadSignedPdfAndClose() {
+    if (!signatureDataUrl) {
+      alert("Signature non reçue.");
+      return;
+    }
+
+    const downloaded = await downloadSortiePdf();
+    if (!downloaded) return;
+
+    await handleValidateOutputs(finalModal.personName);
   }
 
   function openFavoritesModal(group: FavoritesGroup) {
@@ -890,9 +939,6 @@ export default function SortiePage() {
         <Link href="/products" style={buttonLinkStyle(currentTheme)}>
           Tableau
         </Link>
-
-        <button onClick={sendSignatureLink} style={buttonGhostStyle(currentTheme)}>Signature ajoutée</button>
-        <button onClick={openFinalModal} style={buttonGhostStyle(currentTheme)}>PDF</button>
 
         <button
           onClick={() => openFavoritesModal("epi")}
@@ -1620,31 +1666,53 @@ export default function SortiePage() {
                 Valider
               </button>
 
-              <button
-                type="button"
-                onClick={downloadSortiePdf}
-                disabled={!finalModal.personName.trim()}
-                style={{
-                  ...buttonGhostStyle(currentTheme),
-                  opacity: finalModal.personName.trim() ? 1 : 0.5,
-                  cursor: finalModal.personName.trim() ? "pointer" : "not-allowed",
-                }}
-              >
-                Télécharger PDF
-              </button>
+              {signatureStatus === "signed" ? (
+                <button
+                  type="button"
+                  onClick={downloadSignedPdfAndClose}
+                  disabled={!finalModal.personName.trim() || saving}
+                  style={{
+                    background: currentTheme.accent,
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: 12,
+                    padding: "12px 16px",
+                    fontWeight: 900,
+                    opacity: finalModal.personName.trim() && !saving ? 1 : 0.5,
+                    cursor: finalModal.personName.trim() && !saving ? "pointer" : "not-allowed",
+                  }}
+                >
+                  {saving ? "Validation..." : "Télécharger le PDF signé"}
+                </button>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={downloadSortiePdf}
+                    disabled={!finalModal.personName.trim()}
+                    style={{
+                      ...buttonGhostStyle(currentTheme),
+                      opacity: finalModal.personName.trim() ? 1 : 0.5,
+                      cursor: finalModal.personName.trim() ? "pointer" : "not-allowed",
+                    }}
+                  >
+                    Télécharger PDF
+                  </button>
 
-              <button
-                type="button"
-                onClick={sendSignatureLink}
-                disabled={!finalModal.personName.trim() || signatureStatus === "sending"}
-                style={{
-                  ...buttonGhostStyle(currentTheme),
-                  opacity: finalModal.personName.trim() ? 1 : 0.5,
-                  cursor: finalModal.personName.trim() ? "pointer" : "not-allowed",
-                }}
-              >
-                {signatureStatus === "sending" ? "Envoi..." : signatureStatus === "pending" ? "Mail envoyé" : signatureStatus === "signed" ? "Signature reçue" : "Signature ajoutée"}
-              </button>
+                  <button
+                    type="button"
+                    onClick={sendSignatureLink}
+                    disabled={!finalModal.personName.trim() || signatureStatus === "sending"}
+                    style={{
+                      ...buttonGhostStyle(currentTheme),
+                      opacity: finalModal.personName.trim() ? 1 : 0.5,
+                      cursor: finalModal.personName.trim() ? "pointer" : "not-allowed",
+                    }}
+                  >
+                    {signatureStatus === "sending" ? "Envoi..." : signatureStatus === "pending" ? "Mail envoyé" : "Faire signer"}
+                  </button>
+                </>
+              )}
 
               {signatureRequestToken && signatureStatus !== "signed" && (
                 <button

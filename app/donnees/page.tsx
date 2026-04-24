@@ -88,6 +88,7 @@ type AdminSettingsRow = {
 
 type ProductRow = {
   fournisseur: string | null;
+  categorie: string | null;
 };
 
 export default function DonneesPage() {
@@ -109,6 +110,7 @@ export default function DonneesPage() {
   const [codes, setCodes] = useState<AppDataRow[]>([]);
   const [adminSetting, setAdminSetting] = useState<AdminSettingsRow | null>(null);
   const [suppliers, setSuppliers] = useState<string[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
 
   useEffect(() => {
     const savedTheme = localStorage.getItem("stock-theme");
@@ -137,7 +139,7 @@ export default function DonneesPage() {
           .in("type", ["email", "person", "code"])
           .order("created_at", { ascending: false }),
 
-        supabase.from("products").select("fournisseur"),
+        supabase.from("products").select("fournisseur, categorie"),
 
         supabase
           .from("admin_settings")
@@ -184,6 +186,16 @@ export default function DonneesPage() {
       ).sort((a, b) => a.localeCompare(b, "fr"));
 
       setSuppliers(uniqueSuppliers);
+
+      const uniqueCategories = Array.from(
+        new Set(
+          productRows
+            .map((row) => row.categorie?.trim() || "")
+            .filter((value) => value.length > 0)
+        )
+      ).sort((a, b) => a.localeCompare(b, "fr"));
+
+      setCategories(uniqueCategories);
     } finally {
       setLoading(false);
     }
@@ -400,6 +412,10 @@ export default function DonneesPage() {
   const supplierCountLabel = useMemo(() => {
     return `${suppliers.length} fournisseur${suppliers.length > 1 ? "s" : ""}`;
   }, [suppliers.length]);
+
+  const categoryCountLabel = useMemo(() => {
+    return `${categories.length} catégorie${categories.length > 1 ? "s" : ""}`;
+  }, [categories.length]);
 
   return (
     <main
@@ -651,6 +667,36 @@ export default function DonneesPage() {
                       Source officielle des validations d'accès
                     </div>
                   </div>
+                )}
+              </div>
+            </section>
+
+            <section style={cardStyle(currentTheme)}>
+              <div style={sectionLabelStyle(currentTheme)}>
+                Catégories du stock
+              </div>
+
+              <div
+                style={{
+                  color: currentTheme.textSoft,
+                  fontSize: 13,
+                  marginBottom: 16,
+                }}
+              >
+                {categoryCountLabel}
+              </div>
+
+              <div style={{ display: "grid", gap: 10 }}>
+                {categories.length === 0 ? (
+                  <div style={emptyStyle(currentTheme)}>
+                    Aucune catégorie trouvée dans la table products
+                  </div>
+                ) : (
+                  categories.map((category) => (
+                    <div key={category} style={supplierRowStyle(currentTheme)}>
+                      {category}
+                    </div>
+                  ))
                 )}
               </div>
             </section>

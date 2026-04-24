@@ -122,10 +122,6 @@ useAccessRealtime(
   }
 );
 
-  () => {
-    setRequestStatusText("❌ Demande refusée");
-  }
-
   const codeInputRef = useRef<HTMLInputElement | null>(null);
   const forgotOkButtonRef = useRef<HTMLButtonElement | null>(null);
 
@@ -389,6 +385,14 @@ async function loadRegularizeCount() {
                     text="Gestion des emails, personnes, codes et e-mails admin"
                   />
                 </button>
+
+                <Link href="/commande" style={{ textDecoration: "none", color: "inherit" }}>
+                  <MiniCard
+                    t={t}
+                    title="Commande"
+                    text="Suivi et gestion des commandes"
+                  />
+                </Link>
 
                 <Link href="/historique" style={{ textDecoration: "none", color: "inherit" }}>
                   <MiniCard

@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://stock-riseup.vercel.app").replace(/\/$/, "");
 
 function getAdminSupabase() {
   if (!supabaseUrl || !supabaseServiceRoleKey) {
@@ -56,7 +57,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: updateError.message }, { status: 500 });
     }
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({
+      ok: true,
+      redirectUrl: `${appUrl}/signature/merci`,
+    });
   } catch (error: any) {
     console.error(error);
     return NextResponse.json({ error: error?.message || "Erreur serveur." }, { status: 500 });

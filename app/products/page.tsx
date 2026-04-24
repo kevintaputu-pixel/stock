@@ -2009,7 +2009,7 @@ async function loadProducts(options?: { showLoader?: boolean }) {
                   Import Excel
                 </div>
                 <div style={{ color: currentTheme.textSoft, fontSize: 14 }}>
-                  Import professionnel du catalogue stock avec contrôle des
+                  Import direct des données dans l'onglet Stock avec contrôle des
                   en-têtes avant intégration.
                 </div>
               </div>
@@ -2053,7 +2053,7 @@ async function loadProducts(options?: { showLoader?: boolean }) {
                   }}
                 >
                   <span style={badgeStyle(currentTheme)}>
-                    Format accepté : .xlsx / .xls
+                    Format importé : .xlsx / .xlsm / .xls
                   </span>
                   <span style={badgeStyle(currentTheme)}>
                     Référence clé : REF_MAG
@@ -2108,7 +2108,7 @@ async function loadProducts(options?: { showLoader?: boolean }) {
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".xlsx,.xls"
+                  accept=".xlsx,.xlsm,.xls"
                   onChange={handleExcelFileChange}
                   style={{ display: "none" }}
                 />
@@ -2125,7 +2125,7 @@ async function loadProducts(options?: { showLoader?: boolean }) {
                 >
                   {importing
                     ? "Import en cours..."
-                    : "Choisir un fichier Excel"}
+                    : "Choisir un fichier à importer"}
                 </button>
 
                 <div

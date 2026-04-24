@@ -57,6 +57,15 @@ type NewArticleForm = {
   qte_souhaite: string;
 };
 
+type WarehouseZoneBox = {
+  code: string;
+  left: string;
+  top: string;
+  width: string;
+  height: string;
+  fontSize?: number;
+};
+
 type ReceiptModalState = {
   open: boolean;
   receptionDate: string;
@@ -135,6 +144,61 @@ const themes: Record<
 
 const themeOrder: ThemeName[] = ["whiteBlue", "dark", "green", "tropical"];
 
+const zoneGroups = [
+  { code: "A", label: "Zone A", color: "rgba(34,197,94,0.14)" },
+  { code: "B", label: "Zone B", color: "rgba(217,70,239,0.14)" },
+  { code: "C", label: "Zone C", color: "rgba(132,204,22,0.14)" },
+  { code: "D", label: "Zone D", color: "rgba(59,130,246,0.14)" },
+];
+
+const warehouseBoxes: WarehouseZoneBox[] = [
+  { code: "A10", left: "4%", top: "5%", width: "7%", height: "12%" },
+  { code: "A11", left: "11.4%", top: "5%", width: "7%", height: "12%" },
+  { code: "A12", left: "18.7%", top: "5%", width: "4.2%", height: "6%" },
+  { code: "A13", left: "22.95%", top: "5%", width: "4.2%", height: "6%" },
+  { code: "A14", left: "27.2%", top: "5%", width: "4.2%", height: "6%" },
+  { code: "A15", left: "18.7%", top: "11%", width: "4.2%", height: "6%" },
+  { code: "A16", left: "22.95%", top: "11%", width: "4.2%", height: "6%" },
+  { code: "A17", left: "27.2%", top: "11%", width: "4.2%", height: "6%" },
+  { code: "A18", left: "18.7%", top: "17%", width: "4.2%", height: "6%" },
+  { code: "A19", left: "22.95%", top: "17%", width: "4.2%", height: "6%" },
+  { code: "A20", left: "27.2%", top: "17%", width: "4.2%", height: "6%" },
+  { code: "A9", left: "0%", top: "5%", width: "4%", height: "40%" },
+  { code: "A8", left: "0%", top: "45%", width: "4%", height: "55%" },
+  { code: "A7", left: "4%", top: "69%", width: "9.8%", height: "31%" },
+  { code: "A6", left: "13.8%", top: "69%", width: "7.3%", height: "31%" },
+  { code: "A34", left: "21.1%", top: "85%", width: "6.1%", height: "15%" },
+  { code: "A30", left: "27.2%", top: "37%", width: "4%", height: "15%" },
+  { code: "A31", left: "27.2%", top: "52%", width: "4%", height: "15%" },
+  { code: "A32", left: "27.2%", top: "67%", width: "4%", height: "15%" },
+  { code: "A33", left: "27.2%", top: "82%", width: "4%", height: "18%" },
+  { code: "B1", left: "30.5%", top: "5%", width: "3.4%", height: "23%" },
+  { code: "B2", left: "33.9%", top: "5%", width: "3.4%", height: "23%" },
+  { code: "B3", left: "37.3%", top: "5%", width: "3.4%", height: "23%" },
+  { code: "B4", left: "40.7%", top: "5%", width: "3.4%", height: "23%" },
+  { code: "B5", left: "44.1%", top: "5%", width: "3.4%", height: "23%" },
+  { code: "B6", left: "47.5%", top: "5%", width: "3.4%", height: "23%" },
+  { code: "B7", left: "50.9%", top: "5%", width: "3.4%", height: "23%" },
+  { code: "C8", left: "54.3%", top: "5%", width: "3.3%", height: "23%" },
+  { code: "C9", left: "57.6%", top: "5%", width: "3.3%", height: "23%" },
+  { code: "C10", left: "60.9%", top: "5%", width: "3.3%", height: "23%" },
+  { code: "C11", left: "64.2%", top: "5%", width: "3.3%", height: "23%" },
+  { code: "C12", left: "67.5%", top: "5%", width: "3.3%", height: "23%" },
+  { code: "C13", left: "70.8%", top: "5%", width: "3.3%", height: "23%" },
+  { code: "C14", left: "74.1%", top: "5%", width: "3.3%", height: "23%" },
+  { code: "C18", left: "54.3%", top: "28%", width: "3.3%", height: "18%" },
+  { code: "C17", left: "60.9%", top: "28%", width: "3.3%", height: "18%" },
+  { code: "C16", left: "67.5%", top: "28%", width: "3.3%", height: "18%" },
+  { code: "C15", left: "74.1%", top: "28%", width: "3.3%", height: "18%" },
+  { code: "C25", left: "54.3%", top: "77%", width: "3.3%", height: "23%" },
+  { code: "C24", left: "57.6%", top: "77%", width: "3.3%", height: "23%" },
+  { code: "C23", left: "60.9%", top: "77%", width: "3.3%", height: "23%" },
+  { code: "C22", left: "64.2%", top: "77%", width: "3.3%", height: "23%" },
+  { code: "C21", left: "67.5%", top: "77%", width: "3.3%", height: "23%" },
+  { code: "C20", left: "70.8%", top: "77%", width: "3.3%", height: "23%" },
+  { code: "C19", left: "74.1%", top: "77%", width: "3.3%", height: "23%" },
+];
+
 export default function EntreesPage() {
   const [theme, setTheme] = useState<ThemeName>("whiteBlue");
   const [products, setProducts] = useState<Product[]>([]);
@@ -147,6 +211,9 @@ export default function EntreesPage() {
   const [saving, setSaving] = useState(false);
 
   const [showNewArticleModal, setShowNewArticleModal] = useState(false);
+  const [showZonePicker, setShowZonePicker] = useState(false);
+  const [showCategoryPicker, setShowCategoryPicker] = useState(false);
+  const [showFournisseurPicker, setShowFournisseurPicker] = useState(false);
   const [creatingArticle, setCreatingArticle] = useState(false);
   const [nextRefMag, setNextRefMag] = useState("");
   const [newArticleForm, setNewArticleForm] = useState<NewArticleForm>({
@@ -352,6 +419,46 @@ export default function EntreesPage() {
 
   const currentTheme = themes[theme];
 
+  const categoryOptions = useMemo(() => {
+    return Array.from(
+      new Set(
+        products
+          .map((product) => (product.categorie || "").trim())
+          .filter(Boolean)
+      )
+    ).sort((a, b) => a.localeCompare(b, "fr"));
+  }, [products]);
+
+  const fournisseurOptions = useMemo(() => {
+    return Array.from(
+      new Set(
+        products
+          .map((product) => (product.fournisseur || "").trim())
+          .filter(Boolean)
+      )
+    ).sort((a, b) => a.localeCompare(b, "fr"));
+  }, [products]);
+
+  function selectCategoryForNewArticle(categorie: string) {
+    setNewArticleForm((prev) => ({ ...prev, categorie }));
+    setShowCategoryPicker(false);
+  }
+
+  function selectFournisseurForNewArticle(fournisseur: string) {
+    setNewArticleForm((prev) => ({ ...prev, fournisseur }));
+    setShowFournisseurPicker(false);
+  }
+
+  function selectZoneForNewArticle(zone: string) {
+    const cleanZone = zone.trim();
+    const zoneLabel = cleanZone.toUpperCase().startsWith("ZONE ")
+      ? cleanZone
+      : `ZONE ${cleanZone}`;
+
+    setNewArticleForm((prev) => ({ ...prev, zone: zoneLabel }));
+    setShowZonePicker(false);
+  }
+
   function addExistingProductToLeft(product: Product) {
     setEntryItems((prev) => {
       const exists = prev.find(
@@ -546,19 +653,14 @@ export default function EntreesPage() {
   }
 
   async function confirmSaveWithoutPdf() {
-    if (pdfConfirmModal.selected === "non") {
-      setPdfConfirmModal({
-        open: false,
-        selected: "non",
-      });
-      await saveEntriesOnly();
+    if (pdfConfirmModal.selected === "oui") {
+      setPdfConfirmModal({ open: false, selected: "non" });
+      await downloadEntriesPdf();
       return;
     }
 
-    setPdfConfirmModal({
-      open: false,
-      selected: "non",
-    });
+    setPdfConfirmModal({ open: false, selected: "non" });
+    await saveEntriesOnly();
   }
 
   async function saveEntriesOnly() {
@@ -1231,12 +1333,14 @@ export default function EntreesPage() {
                 }
                 theme={currentTheme}
               />
-              <Field
+              <FieldWithButton
                 label="Catégorie"
                 value={newArticleForm.categorie}
                 onChange={(v) =>
                   setNewArticleForm((prev) => ({ ...prev, categorie: v }))
                 }
+                onOpen={() => setShowCategoryPicker(true)}
+                buttonLabel="▾"
                 theme={currentTheme}
               />
               <Field
@@ -1266,12 +1370,14 @@ export default function EntreesPage() {
                 }
                 theme={currentTheme}
               />
-              <Field
+              <FieldWithButton
                 label="Fournisseur"
                 value={newArticleForm.fournisseur}
                 onChange={(v) =>
                   setNewArticleForm((prev) => ({ ...prev, fournisseur: v }))
                 }
+                onOpen={() => setShowFournisseurPicker(true)}
+                buttonLabel="▾"
                 theme={currentTheme}
               />
               <Field
@@ -1282,12 +1388,14 @@ export default function EntreesPage() {
                 }
                 theme={currentTheme}
               />
-              <Field
+              <FieldWithButton
                 label="Zone"
                 value={newArticleForm.zone}
                 onChange={(v) =>
                   setNewArticleForm((prev) => ({ ...prev, zone: v }))
                 }
+                onOpen={() => setShowZonePicker(true)}
+                buttonLabel="▾"
                 theme={currentTheme}
               />
               <Field
@@ -1367,6 +1475,95 @@ export default function EntreesPage() {
               >
                 Continuer
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showCategoryPicker && (
+        <ChoicePickerModal
+          title="Choisir une catégorie"
+          subtitle="Clique sur une catégorie pour remplir automatiquement le champ Catégorie."
+          options={categoryOptions}
+          emptyText="Aucune catégorie trouvée."
+          onSelect={selectCategoryForNewArticle}
+          onClose={() => setShowCategoryPicker(false)}
+          currentTheme={currentTheme}
+        />
+      )}
+
+      {showFournisseurPicker && (
+        <ChoicePickerModal
+          title="Choisir un fournisseur"
+          subtitle="Clique sur un fournisseur pour remplir automatiquement le champ Fournisseur."
+          options={fournisseurOptions}
+          emptyText="Aucun fournisseur trouvé."
+          onSelect={selectFournisseurForNewArticle}
+          onClose={() => setShowFournisseurPicker(false)}
+          currentTheme={currentTheme}
+        />
+      )}
+
+      {showZonePicker && (
+        <div
+          onClick={() => setShowZonePicker(false)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: currentTheme.overlay,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 24,
+            zIndex: 1200,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "100%",
+              maxWidth: 1450,
+              background: currentTheme.card,
+              border: `1px solid ${currentTheme.border}`,
+              borderRadius: 28,
+              padding: 20,
+              boxShadow: `0 20px 60px ${currentTheme.shadow}`,
+              maxHeight: "92vh",
+              overflow: "auto",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "center", flexWrap: "wrap", marginBottom: 16 }}>
+              <div>
+                <div style={{ fontSize: 24, fontWeight: 900 }}>Plan des zones</div>
+                <div style={{ marginTop: 4, color: currentTheme.textSoft, fontSize: 14 }}>
+                  Clique sur une zone pour remplir automatiquement le champ Zone.
+                </div>
+              </div>
+              <button onClick={() => setShowZonePicker(false)} style={{ background: currentTheme.accent, color: "#fff", border: "none", borderRadius: 12, padding: "11px 16px", fontWeight: 800, cursor: "pointer" }}>
+                Fermer
+              </button>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 12, marginBottom: 18 }}>
+              {zoneGroups.map((group) => (
+                <button key={group.code} onClick={() => selectZoneForNewArticle(group.code)} style={{ background: group.color, border: `1px solid ${currentTheme.border}`, borderRadius: 18, padding: "14px 16px", color: currentTheme.text, fontWeight: 900, fontSize: 16, cursor: "pointer", textAlign: "left" }}>
+                  {group.label}
+                </button>
+              ))}
+            </div>
+
+            <div style={{ position: "relative", width: "100%", minWidth: 1180, aspectRatio: "16 / 6", borderRadius: 24, background: currentTheme.cardSoft, border: `2px solid ${currentTheme.border}`, overflow: "hidden" }}>
+              <div style={{ position: "absolute", left: "65.2%", top: "84.5%", width: "13.4%", height: 2, background: currentTheme.border }} />
+              <button onClick={() => selectZoneForNewArticle("A")} style={{ ...zoneAreaStyle(currentTheme, "rgba(34,197,94,0.13)"), left: "9.0%", top: "52%", width: "11.2%", height: "12%" }}>Zone A</button>
+              <button onClick={() => selectZoneForNewArticle("B")} style={{ ...zoneAreaStyle(currentTheme, "rgba(217,70,239,0.13)"), left: "36.2%", top: "52%", width: "11.2%", height: "12%" }}>Zone B</button>
+              <button onClick={() => selectZoneForNewArticle("C")} style={{ ...zoneAreaStyle(currentTheme, "rgba(132,204,22,0.13)"), left: "63.4%", top: "52%", width: "11.2%", height: "12%" }}>Zone C</button>
+              <button onClick={() => selectZoneForNewArticle("D")} style={{ ...zoneAreaStyle(currentTheme, "rgba(59,130,246,0.13)"), left: "84.0%", top: "52%", width: "12.0%", height: "12%" }}>Zone D</button>
+              <div style={{ position: "absolute", left: "84.0%", top: "10.5%", color: currentTheme.textSoft, fontSize: 13, fontWeight: 700 }}>Salle du fond à droite</div>
+              <div style={{ position: "absolute", left: "36.6%", bottom: "0%", width: "13.3%", height: "8%", border: `2px solid ${currentTheme.border}`, borderBottom: "none", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 900, color: currentTheme.text, background: currentTheme.card }}>ENTREE</div>
+              {warehouseBoxes.map((box) => (
+                <button key={box.code} onClick={() => selectZoneForNewArticle(box.code)} title={`Choisir ${box.code}`} style={{ position: "absolute", left: box.left, top: box.top, width: box.width, height: box.height, border: `2px solid ${currentTheme.border}`, background: currentTheme.card, color: currentTheme.text, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 500, fontSize: box.fontSize || 14 }}>
+                  {box.code}
+                </button>
+              ))}
             </div>
           </div>
         </div>
@@ -1671,7 +1868,7 @@ export default function EntreesPage() {
                 marginBottom: 18,
               }}
             >
-               pas besoin du PDF ?
+              Besoin du PDF ?
             </div>
 
             <div
@@ -1682,12 +1879,10 @@ export default function EntreesPage() {
               }}
             >
               <button
-                onClick={() =>
-                  setPdfConfirmModal({
-                    open: false,
-                    selected: "non",
-                  })
-                }
+                onClick={async () => {
+                  setPdfConfirmModal((prev) => ({ ...prev, selected: "non" }));
+                  await saveEntriesOnly();
+                }}
                 onFocus={() =>
                   setPdfConfirmModal((prev) => ({
                     ...prev,
@@ -1718,11 +1913,9 @@ export default function EntreesPage() {
               </button>
 
               <button
-                onClick={() => {
-                  setPdfConfirmModal({
-                    open: false,
-                    selected: "non",
-                  });
+                onClick={async () => {
+                  setPdfConfirmModal((prev) => ({ ...prev, selected: "oui" }));
+                  await downloadEntriesPdf();
                 }}
                 onFocus={() =>
                   setPdfConfirmModal((prev) => ({
@@ -1749,7 +1942,7 @@ export default function EntreesPage() {
                   cursor: "pointer",
                 }}
               >
-                Oui
+                Si j’ai besoin
               </button>
             </div>
           </div>
@@ -1757,6 +1950,207 @@ export default function EntreesPage() {
       )}
 
     </main>
+  );
+}
+
+function ChoicePickerModal({
+  title,
+  subtitle,
+  options,
+  emptyText,
+  onSelect,
+  onClose,
+  currentTheme,
+}: {
+  title: string;
+  subtitle: string;
+  options: string[];
+  emptyText: string;
+  onSelect: (value: string) => void;
+  onClose: () => void;
+  currentTheme: {
+    card: string;
+    cardSoft: string;
+    border: string;
+    text: string;
+    textSoft: string;
+    accent: string;
+    shadow: string;
+    overlay: string;
+  };
+}) {
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: currentTheme.overlay,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 24,
+        zIndex: 1200,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: "100%",
+          maxWidth: 900,
+          maxHeight: "86vh",
+          overflowY: "auto",
+          background: currentTheme.card,
+          border: `1px solid ${currentTheme.border}`,
+          borderRadius: 28,
+          padding: 20,
+          boxShadow: `0 20px 60px ${currentTheme.shadow}`,
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            gap: 16,
+            alignItems: "center",
+            flexWrap: "wrap",
+            marginBottom: 16,
+          }}
+        >
+          <div>
+            <div style={{ fontSize: 24, fontWeight: 900 }}>{title}</div>
+            <div style={{ marginTop: 4, color: currentTheme.textSoft, fontSize: 14 }}>
+              {subtitle}
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              background: currentTheme.accent,
+              color: "#fff",
+              border: "none",
+              borderRadius: 12,
+              padding: "11px 16px",
+              fontWeight: 800,
+              cursor: "pointer",
+            }}
+          >
+            Fermer
+          </button>
+        </div>
+
+        {options.length === 0 ? (
+          <div
+            style={{
+              background: currentTheme.cardSoft,
+              border: `1px solid ${currentTheme.border}`,
+              borderRadius: 18,
+              padding: 18,
+              color: currentTheme.textSoft,
+              fontWeight: 700,
+            }}
+          >
+            {emptyText}
+          </div>
+        ) : (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
+              gap: 12,
+            }}
+          >
+            {options.map((option) => (
+              <button
+                key={option}
+                onClick={() => onSelect(option)}
+                style={{
+                  background: currentTheme.cardSoft,
+                  color: currentTheme.text,
+                  border: `1px solid ${currentTheme.border}`,
+                  borderRadius: 18,
+                  padding: "15px 16px",
+                  fontWeight: 900,
+                  fontSize: 15,
+                  cursor: "pointer",
+                  textAlign: "left",
+                  boxShadow: `0 10px 30px ${currentTheme.shadow}`,
+                }}
+              >
+                {option}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SelectField({
+  label,
+  value,
+  onChange,
+  options,
+  placeholder,
+  theme,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: string[];
+  placeholder: string;
+  theme: {
+    cardSoft: string;
+    border: string;
+    text: string;
+    textSoft: string;
+  };
+}) {
+  return (
+    <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      <span style={{ fontSize: 13, color: theme.textSoft }}>{label}</span>
+      <select value={value} onChange={(e) => onChange(e.target.value)} style={{ width: "100%", background: theme.cardSoft, color: theme.text, border: `1px solid ${theme.border}`, borderRadius: 12, padding: "12px 14px", outline: "none", fontSize: 14, cursor: "pointer" }}>
+        <option value="">{placeholder}</option>
+        {options.map((option) => (
+          <option key={option} value={option}>{option}</option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function FieldWithButton({
+  label,
+  value,
+  onChange,
+  onOpen,
+  buttonLabel,
+  theme,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  onOpen: () => void;
+  buttonLabel: string;
+  theme: {
+    cardSoft: string;
+    border: string;
+    text: string;
+    textSoft: string;
+    accent: string;
+  };
+}) {
+  return (
+    <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      <span style={{ fontSize: 13, color: theme.textSoft }}>{label}</span>
+      <div style={{ display: "flex", gap: 8 }}>
+        <input type="text" value={value} onChange={(e) => onChange(e.target.value)} style={{ width: "100%", background: theme.cardSoft, color: theme.text, border: `1px solid ${theme.border}`, borderRadius: 12, padding: "12px 14px", outline: "none", fontSize: 14 }} />
+        <button type="button" onClick={onOpen} style={{ minWidth: 48, background: theme.accent, color: "#fff", border: "none", borderRadius: 12, fontWeight: 900, fontSize: 18, cursor: "pointer" }} aria-label={`Ouvrir ${label}`}>
+          {buttonLabel}
+        </button>
+      </div>
+    </label>
   );
 }
 
@@ -1832,6 +2226,25 @@ function inputStyle(theme: {
     padding: "12px 14px",
     outline: "none",
     fontSize: 14,
+  };
+}
+
+function zoneAreaStyle(
+  theme: { border: string; text: string },
+  background: string
+): React.CSSProperties {
+  return {
+    position: "absolute",
+    border: `1px solid ${theme.border}`,
+    background,
+    color: theme.text,
+    borderRadius: 0,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: 22,
+    fontWeight: 500,
+    cursor: "pointer",
   };
 }
 
