@@ -271,6 +271,25 @@ const excelHeaders = [
   "Prix Globale",
 ];
 
+const exportExcelHeaders = [
+  "Catégorie", // A
+  "Référence Magasin", // B
+  "Désignation", // C
+  "Référence Fournisseur", // D
+  "Fournisseur", // E
+  "Info", // F
+  "Zone", // G
+  "Demandeur", // H
+  "Stock initiale", // I
+  "", // J conservée vide
+  "", // K conservée vide
+  "", // L conservée vide
+  "", // M conservée vide
+  "Seuille d'alerte", // N
+  "Prix unitaire", // O
+  "Quantité souhaité pour la commande", // P
+];
+
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1209,7 +1228,7 @@ async function loadProducts(options?: { showLoader?: boolean }) {
       const parsedRows = rawRows
         .map((row) => {
           const values = Array.isArray(row) ? row : [];
-          const si = normalizeNumber(values[8] as string | number | null | undefined);
+          const si = normalizeNumber(values[11] as string | number | null | undefined);
           const e = normalizeNumber(values[9] as string | number | null | undefined);
           const s = normalizeNumber(values[10] as string | number | null | undefined);
           const sfFromFile = normalizeNumber(values[11] as string | number | null | undefined);
@@ -1314,26 +1333,25 @@ async function loadProducts(options?: { showLoader?: boolean }) {
     try {
       const XLSX = await import("xlsx");
       const rows = sortedProducts.map((product) => ([
-        product.categorie ?? "",
-        product.ref_mag ?? "",
-        product.designation ?? "",
-        product.ref_fournisseur ?? "",
-        product.fournisseur ?? "",
-        product.info ?? "",
-        product.zone ?? "",
-        product.demandeur ?? "",
-        product.si ?? "",
-        product.e ?? "",
-        product.s ?? "",
-        product.sf ?? "",
-        product.inventaire ?? "",
-        product.seuil_alerte ?? "",
-        product.prix ?? "",
-        product.qte_souhaite ?? "",
-        product.prix_final ?? "",
+        product.categorie ?? "", // A
+        product.ref_mag ?? "", // B
+        product.designation ?? "", // C
+        product.ref_fournisseur ?? "", // D
+        product.fournisseur ?? "", // E
+        product.info ?? "", // F
+        product.zone ?? "", // G
+        product.demandeur ?? "", // H
+        product.si ?? "", // I
+        "", // J conservée vide
+        "", // K conservée vide
+        "", // L conservée vide
+        "", // M conservée vide
+        product.seuil_alerte ?? "", // N
+        product.prix ?? "", // O
+        product.qte_souhaite ?? "", // P
       ]));
       const worksheet = XLSX.utils.aoa_to_sheet([
-        excelHeaders,
+        exportExcelHeaders,
         ...rows,
       ]);
       const workbook = XLSX.utils.book_new();
