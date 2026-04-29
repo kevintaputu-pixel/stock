@@ -22,6 +22,7 @@ type Theme = {
 
 type Product = {
   id: string;
+  categorie: string | null;
   designation: string | null;
   ref_mag: string | null;
   fournisseur: string | null;
@@ -118,7 +119,7 @@ export default function RegularisationPage() {
 
     const { data, error } = await supabase
       .from("products")
-      .select("id, designation, ref_mag, fournisseur, zone, info, sf, inventaire")
+      .select("id, categorie, designation, ref_mag, fournisseur, zone, info, sf, inventaire")
       .order("designation", { ascending: true });
 
     if (error) {
@@ -154,6 +155,34 @@ export default function RegularisationPage() {
     return (product.inventaire ?? 0) - (product.sf ?? 0);
   }
 
+  function sameNumber(a: number | null | undefined, b: number | null | undefined) {
+    if (a === null || a === undefined || b === null || b === undefined) return false;
+    return Number(a) === Number(b);
+  }
+
+  async function clearInventairesIdentiquesAuStockFinal() {
+    const { data, error } = await supabase
+      .from("products")
+      .select("id, sf, inventaire")
+      .not("inventaire", "is", null)
+      .not("sf", "is", null);
+
+    if (error) throw error;
+
+    const idsToClear = ((data as Pick<Product, "id" | "sf" | "inventaire">[]) || [])
+      .filter((product) => sameNumber(product.inventaire, product.sf))
+      .map((product) => product.id);
+
+    if (idsToClear.length === 0) return;
+
+    const { error: updateError } = await supabase
+      .from("products")
+      .update({ inventaire: null, info: "" })
+      .in("id", idsToClear);
+
+    if (updateError) throw updateError;
+  }
+
   const toRegularize = useMemo(() => {
     return products.filter(
       (p) => p.inventaire !== null && p.sf !== null && p.inventaire !== p.sf
@@ -175,14 +204,13 @@ export default function RegularisationPage() {
 
     const diff = product.inventaire - product.sf;
     const regDate = new Date();
-    const regLabel = `Inv. fait le ${regDate.toLocaleDateString("fr-FR")}`;
-
     const { error: movementError } = await supabase.from("movements").insert({
+      categorie: product.categorie ?? "",
       designation: product.designation,
       ref_mag: product.ref_mag,
       fournisseur: product.fournisseur,
       zone: product.zone,
-      info: regLabel,
+      info: "",
       entrees: diff > 0 ? diff : 0,
       sorties: diff < 0 ? Math.abs(diff) : 0,
       intervenant: "Régul inventaire",
@@ -195,7 +223,8 @@ export default function RegularisationPage() {
       .from("products")
       .update({
         sf: product.inventaire,
-        info: regLabel,
+        inventaire: null,
+        info: "",
       })
       .eq("id", product.id);
 
@@ -206,6 +235,7 @@ export default function RegularisationPage() {
     setSavingId(product.id);
     try {
       await applyRegularization(product);
+      await clearInventairesIdentiquesAuStockFinal();
       await load();
     } catch (error: any) {
       console.error(error);
@@ -225,6 +255,8 @@ export default function RegularisationPage() {
       for (const product of toRegularize) {
         await applyRegularization(product);
       }
+
+      await clearInventairesIdentiquesAuStockFinal();
       await load();
     } catch (error: any) {
       console.error(error);

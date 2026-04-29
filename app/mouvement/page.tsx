@@ -220,7 +220,35 @@ async function loadCodes() {
       return;
     }
 
-    setData((data as Movement[]) || []);
+    const movements = ((data as Movement[]) || []);
+    const missingCategoryRefs = Array.from(new Set(
+      movements
+        .filter((item) => !item.categorie && item.ref_mag)
+        .map((item) => item.ref_mag as string)
+    ));
+
+    if (missingCategoryRefs.length > 0) {
+      const { data: productRows } = await supabase
+        .from("products")
+        .select("ref_mag, categorie")
+        .in("ref_mag", missingCategoryRefs);
+
+      const categoryByRef = new Map(
+        ((productRows || []) as Array<{ ref_mag: string | null; categorie: string | null }>)
+          .filter((row) => row.ref_mag)
+          .map((row) => [row.ref_mag as string, row.categorie || ""])
+      );
+
+      setData(
+        movements.map((item) => ({
+          ...item,
+          categorie: item.categorie || (item.ref_mag ? categoryByRef.get(item.ref_mag) || null : null),
+        }))
+      );
+    } else {
+      setData(movements);
+    }
+
     setLoading(false);
   }
 
@@ -468,7 +496,7 @@ async function loadCodes() {
         item.sorties ?? "",
         item.intervenant ?? "",
         item.entrees ?? "",
-        item.date ?? "",
+        formatMovementDate(item.date),
         item.lieu ?? "",
       ]);
 

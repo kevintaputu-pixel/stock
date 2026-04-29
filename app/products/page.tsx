@@ -872,16 +872,15 @@ async function loadProducts(options?: { showLoader?: boolean }) {
     return d.toLocaleDateString("fr-FR");
   }
 
+  function isInventoryInfo(value: string | null | undefined) {
+    return !!value && value.startsWith("Inv. fait le");
+  }
+
+  function getInfoDisplay(product: Product) {
+    return isInventoryInfo(product.info) ? "-" : product.info || "-";
+  }
+
   function getInventaireDisplay(product: Product) {
-    if (
-      product.sf !== null &&
-      product.inventaire !== null &&
-      product.sf === product.inventaire &&
-      product.info &&
-      product.info.startsWith("Inv. fait le")
-    ) {
-      return product.info;
-    }
     return formatNumber(product.inventaire);
   }
 
@@ -1087,7 +1086,7 @@ async function loadProducts(options?: { showLoader?: boolean }) {
       product.designation,
       product.ref_fournisseur,
       product.fournisseur,
-      product.info,
+      isInventoryInfo(product.info) ? null : product.info,
       product.zone,
       product.demandeur,
       product.si,
@@ -1120,7 +1119,7 @@ async function loadProducts(options?: { showLoader?: boolean }) {
       case "fournisseur":
         return product.fournisseur ?? "";
       case "info":
-        return product.info ?? "";
+        return isInventoryInfo(product.info) ? "" : product.info ?? "";
       case "zone":
         return product.zone ?? "";
       case "demandeur":
@@ -1338,7 +1337,7 @@ async function loadProducts(options?: { showLoader?: boolean }) {
         product.designation ?? "", // C
         product.ref_fournisseur ?? "", // D
         product.fournisseur ?? "", // E
-        product.info ?? "", // F
+        isInventoryInfo(product.info) ? "" : product.info ?? "", // F
         product.zone ?? "", // G
         product.demandeur ?? "", // H
         product.si ?? "", // I
@@ -1414,7 +1413,7 @@ async function loadProducts(options?: { showLoader?: boolean }) {
         case "fournisseur":
           return product.fournisseur || "-";
         case "info":
-          return product.info || "-";
+          return getInfoDisplay(product);
         case "zone":
           return product.zone || "-";
         case "demandeur":
@@ -1895,7 +1894,7 @@ async function loadProducts(options?: { showLoader?: boolean }) {
                       ...getColumnStyle("info"),
                     }}
                   >
-                    {product.info || "-"}
+                    {getInfoDisplay(product)}
                   </td>
                   <td
                     style={{
