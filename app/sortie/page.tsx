@@ -1086,8 +1086,8 @@ export default function SortiePage() {
                           color: currentTheme.textSoft,
                         }}
                       >
-                        Réf. magasin : {item.ref_mag || "-"} • Fournisseur :{" "}
-                        {item.fournisseur || "-"}
+                        Réf. magasin : {item.ref_mag || "-"} • Réf. fournisseur :{" "}
+                        {item.ref_fournisseur || "-"}
                       </div>
                     </div>
 
@@ -1291,8 +1291,10 @@ export default function SortiePage() {
                           lineHeight: 1.5,
                         }}
                       >
-                        Réf. magasin : {product.ref_mag || "-"} • Fournisseur :{" "}
-                        {product.fournisseur || "-"}
+                        Réf. magasin : {product.ref_mag || "-"} • Réf. fournisseur :{" "}
+                        {product.ref_fournisseur || "-"}
+                        <br />
+                        Fournisseur : {product.fournisseur || "-"}
                         <br />
                         Catégorie : {product.categorie || "-"} • Stock actuel :{" "}
                         {formatNumber(product.sf)}
@@ -1489,8 +1491,10 @@ export default function SortiePage() {
                             lineHeight: 1.5,
                           }}
                         >
-                          Réf. magasin : {product.ref_mag || "-"} • Fournisseur :{" "}
-                          {product.fournisseur || "-"}
+                          Réf. magasin : {product.ref_mag || "-"} • Réf. fournisseur :{" "}
+                          {product.ref_fournisseur || "-"}
+                          <br />
+                          Fournisseur : {product.fournisseur || "-"}
                           <br />
                           Stock actuel : {formatNumber(product.sf)}
                         </div>

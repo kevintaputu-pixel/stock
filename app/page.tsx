@@ -79,7 +79,6 @@ const HOME_ACCESS_KEY = "access:/";
 
 export default function HomePage() {
   const [theme, setTheme] = useState<ThemeName>("whiteBlue");
-  const [regularizeCount, setRegularizeCount] = useState(0);
   const [codes, setCodes] = useState<string[]>([]);
 
   const [authChecked, setAuthChecked] = useState(false);
@@ -138,8 +137,6 @@ useAccessRealtime(
 
   useEffect(() => {
     loadCodes();
-    loadRegularizeCount();
-
     const hasHomeAccess = localStorage.getItem(HOME_ACCESS_KEY) === "true";
     setIsAuthenticated(hasHomeAccess);
     setAuthChecked(true);
@@ -186,33 +183,6 @@ async function loadCodes() {
   setCodes(rows.map((row) => (row.value || "").trim()).filter(Boolean));
 }
 
-async function loadRegularizeCount() {
-  const { data, error } = await supabase
-    .from("products")
-    .select("*"); // ⚠️ on prend tout pour éviter erreur de colonne
-
-  if (error) {
-    console.log("LOAD REGULARIZE ERROR =", error);
-    return;
-  }
-
-  const rows = Array.isArray(data) ? data : [];
-
-  const count = rows.filter((item: any) => {
-    const sf = item?.sf;
-    const inventaire = item?.inventaire;
-
-    return (
-      sf !== null &&
-      sf !== undefined &&
-      inventaire !== null &&
-      inventaire !== undefined &&
-      sf !== inventaire
-    );
-  }).length;
-
-  setRegularizeCount(count);
-}
 
   function cycleTheme() {
     const next = themeOrder[(themeOrder.indexOf(theme) + 1) % themeOrder.length];
@@ -308,8 +278,6 @@ async function loadRegularizeCount() {
   }
 
   const t = themes[theme];
-  const hasAlert = regularizeCount > 0;
-
   if (!authChecked) {
     return (
       <main
@@ -326,7 +294,7 @@ async function loadRegularizeCount() {
       style={{
         minHeight: "100vh",
         background: `
-          radial-gradient(circle at 10% 10%, ${hasAlert ? t.dangerGlow : t.glow} 0%, transparent 30%),
+          radial-gradient(circle at 10% 10%, ${t.glow} 0%, transparent 30%),
           radial-gradient(circle at 90% 90%, ${t.glow} 0%, transparent 30%),
           linear-gradient(135deg, ${t.bg} 0%, ${t.bg2} 100%)
         `,
@@ -344,8 +312,8 @@ async function loadRegularizeCount() {
       {isAuthenticated && (
         <div style={{ maxWidth: 1200, margin: "0 auto", display: "grid", gap: 20 }}>
           <section style={glassCard(t, true)}>
-            <div style={{ display: "grid", gridTemplateColumns: "1.2fr 0.8fr", gap: 20 }}>
-              <div>
+            <div style={{ display: "grid", gridTemplateColumns: "1.15fr 0.85fr", gap: 24, alignItems: "stretch" }}>
+              <div style={{ display: "flex", flexDirection: "column", justifyContent: "center" }}>
                 <div style={badgeStyle(t)}>Stock Manager</div>
 
                 <h1 style={titleStyle()}>
@@ -367,41 +335,25 @@ async function loadRegularizeCount() {
                 </div>
               </div>
 
-              <div style={{ display: "grid", gap: 16 }}>
-                <button
-                  onClick={() => openCodeModal("/donnees")}
-                  style={{
-                    background: "transparent",
-                    border: "none",
-                    padding: 0,
-                    cursor: "pointer",
-                    textAlign: "left",
-                    color: "inherit",
-                  }}
-                >
-                  <MiniCard
-                    t={t}
-                    title="Données"
-                    text="Gestion des emails, personnes, codes et e-mails admin"
-                  />
-                </button>
-
-                <Link href="/commande" style={{ textDecoration: "none", color: "inherit" }}>
-                  <MiniCard
-                    t={t}
-                    title="Commande"
-                    text="Suivi et gestion des commandes"
-                  />
-                </Link>
-
-                <Link href="/historique" style={{ textDecoration: "none", color: "inherit" }}>
-                  <MiniCard
-                    t={t}
-                    title="Historique des mouvements"
-                    text="Voir tous les mouvements enregistrés"
-                  />
-                </Link>
-              </div>
+              <button
+                onClick={() => openCodeModal("/donnees")}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  padding: 0,
+                  cursor: "pointer",
+                  textAlign: "left",
+                  color: "inherit",
+                  height: "100%",
+                }}
+              >
+                <MiniCard
+                  t={t}
+                  title="Données"
+                  text="Gestion des emails, personnes, codes et e-mails admin"
+                  large
+                />
+              </button>
             </div>
           </section>
 
@@ -418,12 +370,7 @@ async function loadRegularizeCount() {
             <Card href="/inventaire" t={t} title="Inventaire" />
             <Card href="/entrees" t={t} title="Entrées" />
             <Card href="/sortie" t={t} title="Sortie" />
-            <ActionCard
-              onClick={() => openCodeModal("/regularisation")}
-              t={t}
-              title={hasAlert ? `Régularisation (${regularizeCount})` : "Régularisation"}
-              highlight={hasAlert}
-            />
+            <Card href="/commande" t={t} title="Commande" />
           </section>
 
           <section style={kittPanelStyle(t)}>
@@ -754,19 +701,19 @@ function kittScannerStyle(): React.CSSProperties {
   };
 }
 
-function MiniCard({ t, title, text }: any) {
+function MiniCard({ t, title, text, large = false }: any) {
   return (
     <div
       style={{
         ...glassCard(t),
-        minHeight: 104,
+        minHeight: large ? 176 : 104,
         display: "flex",
         flexDirection: "column",
         justifyContent: "center",
       }}
     >
-      <div style={{ fontWeight: 900, fontSize: 18, color: t.text }}>{title}</div>
-      <div style={{ fontSize: 13, color: t.textSoft, marginTop: 6 }}>{text}</div>
+      <div style={{ fontWeight: 900, fontSize: large ? 24 : 18, color: t.text }}>{title}</div>
+      <div style={{ fontSize: large ? 15 : 13, color: t.textSoft, marginTop: 8 }}>{text}</div>
     </div>
   );
 }
@@ -802,42 +749,5 @@ function Card({ href, t, title, highlight = false }: any) {
         {title}
       </div>
     </Link>
-  );
-}
-
-function ActionCard({ onClick, t, title, highlight = false }: any) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        background: "transparent",
-        border: "none",
-        padding: 0,
-        cursor: "pointer",
-        textAlign: "left",
-        width: "100%",
-        display: "block",
-      }}
-    >
-      <div
-        style={{
-          ...glassCard(t),
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontWeight: 900,
-          fontSize: 18,
-          minHeight: 120,
-          width: "100%",
-          boxSizing: "border-box",
-          background: highlight ? "rgba(220,38,38,0.18)" : t.glass,
-          border: highlight ? "1px solid rgba(220,38,38,0.38)" : `1px solid ${t.border}`,
-          boxShadow: highlight ? "0 20px 50px rgba(220,38,38,0.24)" : `0 20px 50px ${t.glow}`,
-          color: t.text,
-        }}
-      >
-        {title}
-      </div>
-    </button>
   );
 }

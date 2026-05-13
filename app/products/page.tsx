@@ -1395,6 +1395,19 @@ async function loadProducts(options?: { showLoader?: boolean }) {
     return list;
   }, [filteredProducts, sortEnabled, sortColumn, sortDirection]);
 
+  const totalStockFinal = useMemo(() => {
+    return sortedProducts.reduce((total, product) => {
+      const value = Number(product.sf ?? 0);
+      return total + (Number.isFinite(value) ? value : 0);
+    }, 0);
+  }, [sortedProducts]);
+
+  const totalStockFinalLabel = useMemo(() => {
+    return new Intl.NumberFormat("fr-FR", {
+      maximumFractionDigits: 2,
+    }).format(totalStockFinal);
+  }, [totalStockFinal]);
+
   const autoColumnWidths = useMemo(() => {
     const pxPerChar = 8;
     const extraPadding = 26;
@@ -1614,6 +1627,28 @@ async function loadProducts(options?: { showLoader?: boolean }) {
             >
               {exporting ? "Export Excel..." : "Exporter"}
             </button>
+
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                background: currentTheme.cardSoft,
+                color: currentTheme.text,
+                border: `1px solid ${currentTheme.border}`,
+                padding: "10px 14px",
+                borderRadius: 12,
+                fontWeight: 900,
+                boxShadow: `0 10px 30px ${currentTheme.shadow}`,
+                whiteSpace: "nowrap",
+              }}
+              title="Total de la colonne Stock Final affichée"
+            >
+              <span style={{ color: currentTheme.textSoft, fontWeight: 800 }}>
+                Total Stock Final
+              </span>
+              <span>{totalStockFinalLabel}</span>
+            </div>
 
             <button
               onClick={handleSortToggle}
