@@ -514,47 +514,66 @@ export default function InventairePage() {
     try {
       for (const item of inventoryItems) {
         const countedQty = parseNumber(item.stock_compte);
-        const systemQty = parseNumber(item.stock_systeme || "0");
-        const diff = countedQty - systemQty;
+        const stockFinalQty = parseNumber(item.stock_systeme || "0");
+        const ecart = countedQty - stockFinalQty;
+        const sortieRegularisation = ecart < 0 ? Math.abs(ecart) : 0;
+        const entreeRegularisation = ecart > 0 ? ecart : 0;
 
         const noteBase = "Inventaire";
 
+        const cleanedInfo = item.info
+          .replace(/inventaire/gi, "")
+          .replace(/•\s*•/g, "•")
+          .replace(/^\s*•\s*/, "")
+          .replace(/\s*•\s*$/, "")
+          .trim();
+
         const { error } = await supabase
-        .from("products")
-        .update({
-        inventaire: countedQty,
-        info: noteBase,
-  })
-  .eq("ref_mag", item.ref_mag);
+          .from("products")
+          .update({
+            inventaire: countedQty,
+            sf: countedQty,
+            info: cleanedInfo,
+          })
+          .eq("ref_mag", item.ref_mag);
 
         if (error) throw error;
 
-        const { error: movementError } = await supabase.from("movements").insert({
-          categorie: item.categorie || null,
-          ref_mag: item.ref_mag || null,
-          designation: item.designation || null,
-          ref_fournisseur: item.ref_fournisseur || null,
-          fournisseur: item.fournisseur || null,
-          info: `${noteBase} • système: ${systemQty} • compté: ${countedQty} • écart: ${diff}`,
-          zone: item.zone || null,
-          demandeur: item.demandeur || null,
-          sorties: diff < 0 ? Math.abs(diff) : 0,
-          intervenant: null,
-          entrees: diff > 0 ? diff : 0,
-          date: new Date().toISOString(),
-        });
+        if (ecart !== 0) {
+          const { error: movementError } = await supabase.from("movements").insert({
+            categorie: item.categorie || null,
+            ref_mag: item.ref_mag || null,
+            designation: item.designation || null,
+            ref_fournisseur: item.ref_fournisseur || null,
+            fournisseur: item.fournisseur || null,
+            info: `${noteBase} • stock final: ${stockFinalQty} • inventaire: ${countedQty} • régularisation: ${ecart}`,
+            zone: item.zone || null,
+            demandeur: item.demandeur || null,
+            sorties: sortieRegularisation,
+            intervenant: null,
+            entrees: entreeRegularisation,
+            date: new Date().toISOString(),
+          });
 
-        if (movementError) throw movementError;
+          if (movementError) throw movementError;
+        }
       }
 
       setInventoryItems([]);
       setFinalModal({ open: false, message: "" });
       await loadAll();
     } catch (error: any) {
-      console.error(error);
+      const message =
+        error?.message ||
+        error?.details ||
+        error?.hint ||
+        JSON.stringify(error) ||
+        "Erreur pendant l'enregistrement.";
+
+      console.error("Erreur validation inventaire:", message, error);
       setFinalModal({
         open: true,
-        message: error.message || "Erreur pendant l'enregistrement.",
+        message,
       });
     } finally {
       setSaving(false);
@@ -762,8 +781,8 @@ export default function InventairePage() {
                             color: currentTheme.textSoft,
                           }}
                         >
-                          Réf. magasin : {item.ref_mag || "-"} • Fournisseur :{" "}
-                          {item.fournisseur || "-"}
+                          Réf. magasin : {item.ref_mag || "-"} • Réf. fournisseur :{" "}
+                          {item.ref_fournisseur || "-"} • Fournisseur : {item.fournisseur || "-"}
                         </div>
                       </div>
 
@@ -1009,8 +1028,8 @@ export default function InventairePage() {
                           lineHeight: 1.5,
                         }}
                       >
-                        Réf. magasin : {product.ref_mag || "-"} • Fournisseur :{" "}
-                        {product.fournisseur || "-"}
+                        Réf. magasin : {product.ref_mag || "-"} • Réf. fournisseur :{" "}
+                        {product.ref_fournisseur || "-"} • Fournisseur : {product.fournisseur || "-"}
                         <br />
                         Catégorie : {product.categorie || "-"} • Stock actuel :{" "}
                         {formatNumber(product.sf)}
