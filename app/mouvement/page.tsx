@@ -296,6 +296,47 @@ async function loadCodes() {
           e: current.entrees,
           s: current.sorties,
           sf: si + current.entrees - current.sorties,
+          info: null,
+        })
+        .eq("id", product.id);
+    });
+
+    if (!updates.length) return;
+
+    const results = await Promise.all(updates);
+    const failed = results.find((result) => result.error);
+    if (failed?.error) throw failed.error;
+  }
+
+  async function rolloverProductsStockFinalToInitial() {
+    const { data: productsRows, error: productsError } = await supabase
+      .from("products")
+      .select("id, si, e, s, sf, inventaire, info");
+
+    if (productsError) throw productsError;
+
+    const updates = ((productsRows || []) as Array<{
+      id: string;
+      si: number | null;
+      e: number | null;
+      s: number | null;
+      sf: number | null;
+      inventaire?: number | string | null;
+    }>).map((product) => {
+      const stockInitial = Number(product.si || 0);
+      const entrees = Number(product.e || 0);
+      const sorties = Number(product.s || 0);
+      const stockFinal = product.sf == null ? stockInitial + entrees - sorties : Number(product.sf || 0);
+
+      return supabase
+        .from("products")
+        .update({
+          si: stockFinal,
+          e: 0,
+          s: 0,
+          sf: stockFinal,
+          inventaire: null,
+          info: null,
         })
         .eq("id", product.id);
     });
@@ -523,12 +564,12 @@ async function loadCodes() {
         return;
       }
 
-      await syncProductsWithMovements();
+      await rolloverProductsStockFinalToInitial();
       setData([]);
       setPreviewOpen(false);
       setPendingFileName("");
       setPreviewRows([]);
-      setActionMessage("Export Excel généré puis tous les mouvements ont été supprimés. La page est maintenant vide.");
+      setActionMessage("Export Excel généré puis tous les mouvements ont été supprimés. Le Stock Final est maintenant basculé en Stock initiale, et la colonne Inventaire est vidée.");
     } catch (error) {
       console.error("EXPORT EXCEL ERROR:", error);
       setActionMessage(getReadableErrorMessage(error));

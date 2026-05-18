@@ -876,8 +876,24 @@ async function loadProducts(options?: { showLoader?: boolean }) {
     return !!value && value.startsWith("Inv. fait le");
   }
 
+  function isAutoMovementInfo(value: string | null | undefined) {
+    const text = String(value || "").trim().toLowerCase();
+    if (!text) return false;
+    return (
+      text.startsWith("sortie") ||
+      text.includes("sortie de") ||
+      text.includes("sortie le") ||
+      text.includes("sorti le") ||
+      text.includes("mouvement sortie")
+    );
+  }
+
+  function shouldHideInfo(value: string | null | undefined) {
+    return isInventoryInfo(value) || isAutoMovementInfo(value);
+  }
+
   function getInfoDisplay(product: Product) {
-    return isInventoryInfo(product.info) ? "-" : product.info || "-";
+    return shouldHideInfo(product.info) ? "-" : product.info || "-";
   }
 
   function getInventaireDisplay(product: Product) {
@@ -1086,7 +1102,7 @@ async function loadProducts(options?: { showLoader?: boolean }) {
       product.designation,
       product.ref_fournisseur,
       product.fournisseur,
-      isInventoryInfo(product.info) ? null : product.info,
+      shouldHideInfo(product.info) ? null : product.info,
       product.zone,
       product.demandeur,
       product.si,
@@ -1119,7 +1135,7 @@ async function loadProducts(options?: { showLoader?: boolean }) {
       case "fournisseur":
         return product.fournisseur ?? "";
       case "info":
-        return isInventoryInfo(product.info) ? "" : product.info ?? "";
+        return shouldHideInfo(product.info) ? "" : product.info ?? "";
       case "zone":
         return product.zone ?? "";
       case "demandeur":
@@ -1337,7 +1353,7 @@ async function loadProducts(options?: { showLoader?: boolean }) {
         product.designation ?? "", // C
         product.ref_fournisseur ?? "", // D
         product.fournisseur ?? "", // E
-        isInventoryInfo(product.info) ? "" : product.info ?? "", // F
+        shouldHideInfo(product.info) ? "" : product.info ?? "", // F
         product.zone ?? "", // G
         product.demandeur ?? "", // H
         product.si ?? "", // I

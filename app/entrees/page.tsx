@@ -1224,8 +1224,9 @@ export default function EntreesPage() {
                         Réf. magasin : {product.ref_mag || "-"} • Réf. fournisseur :{" "}
                         {product.ref_fournisseur || "-"}
                         <br />
-                        Catégorie : {product.categorie || "-"} • Stock actuel :{" "}
-                        {formatNumber(product.sf)}
+                        Catégorie : {product.categorie || "-"} • Zone : {product.zone || "-"}
+                        <br />
+                        Stock actuel : {formatNumber(product.sf)}
                       </div>
                     </div>
 
