@@ -280,7 +280,7 @@ const exportExcelHeaders = [
   "Info", // F
   "Zone", // G
   "Demandeur", // H
-  "Stock initiale", // I
+  "", // I conservée vide (Stock initiale non exportée)
   "", // J conservée vide
   "", // K conservée vide
   "", // L conservée vide
@@ -1356,7 +1356,7 @@ async function loadProducts(options?: { showLoader?: boolean }) {
         shouldHideInfo(product.info) ? "" : product.info ?? "", // F
         product.zone ?? "", // G
         product.demandeur ?? "", // H
-        product.si ?? "", // I
+        "", // I conservée vide (Stock initiale non exportée)
         "", // J conservée vide
         "", // K conservée vide
         "", // L conservée vide
