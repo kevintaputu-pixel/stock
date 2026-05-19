@@ -98,11 +98,21 @@ export default function CommandePage() {
   const [loading, setLoading] = useState(true);
   const [selectedDemandeur, setSelectedDemandeur] = useState<string | null>(null);
   const [selectedFournisseur, setSelectedFournisseur] = useState<string | null>(null);
+  const [orderedFournisseurs, setOrderedFournisseurs] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     const savedTheme = localStorage.getItem("stock-theme");
     if (savedTheme && themes[savedTheme as ThemeName]) {
       setTheme(savedTheme as ThemeName);
+    }
+
+    try {
+      const savedOrdered = localStorage.getItem("commande-fournisseurs-commandes-v1");
+      if (savedOrdered) {
+        setOrderedFournisseurs(JSON.parse(savedOrdered));
+      }
+    } catch {
+      setOrderedFournisseurs({});
     }
   }, []);
 
@@ -205,6 +215,23 @@ export default function CommandePage() {
     setSelectedFournisseur(null);
   }
 
+  function orderKey(demandeur: string, fournisseur: string) {
+    return `${demandeur}__${fournisseur}`;
+  }
+
+  function toggleFournisseurCommande(demandeur: string, fournisseur: string) {
+    const key = orderKey(demandeur, fournisseur);
+    setOrderedFournisseurs((prev) => {
+      const next = { ...prev, [key]: !prev[key] };
+      localStorage.setItem("commande-fournisseurs-commandes-v1", JSON.stringify(next));
+      return next;
+    });
+  }
+
+  function isFournisseurCommande(demandeur: string, fournisseur: string) {
+    return Boolean(orderedFournisseurs[orderKey(demandeur, fournisseur)]);
+  }
+
   function downloadPdf() {
     if (!currentDemandeur || !currentFournisseur) return;
 
@@ -300,16 +327,42 @@ export default function CommandePage() {
                 <TopLine t={t} title={`2. Fournisseurs de ${currentDemandeur.demandeur}`} count={`${currentDemandeur.fournisseurs.length} fournisseur(s)`} />
               </div>
               <div style={gridCards()}>
-                {currentDemandeur.fournisseurs.map((group) => (
-                  <button key={group.fournisseur} onClick={() => setSelectedFournisseur(group.fournisseur)} style={selectCard(t)}>
-                    <div style={smallLabel(t)}>Fournisseur</div>
-                    <div style={{ fontSize: 24, fontWeight: 900, marginTop: 8 }}>{group.fournisseur}</div>
-                    <div style={{ marginTop: 16 }}>
-                      <SmallInfo t={t} label="Quantité souhaitée" value={group.totalQte} large />
+                {currentDemandeur.fournisseurs.map((group) => {
+                  const isCommande = isFournisseurCommande(currentDemandeur.demandeur, group.fournisseur);
+
+                  return (
+                    <div
+                      key={group.fournisseur}
+                      onClick={() => setSelectedFournisseur(group.fournisseur)}
+                      style={selectCard(t, isCommande)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          setSelectedFournisseur(group.fournisseur);
+                        }
+                      }}
+                    >
+                      <div style={smallLabel(isCommande ? commandeTheme(t) : t)}>Fournisseur</div>
+                      <div style={{ fontSize: 24, fontWeight: 900, marginTop: 8 }}>{group.fournisseur}</div>
+                      <div style={{ marginTop: 16 }}>
+                        <SmallInfo t={isCommande ? commandeTheme(t) : t} label="Quantité souhaitée" value={group.totalQte} large />
+                      </div>
+                      <div style={{ marginTop: 16, color: isCommande ? "#14532d" : t.accent, fontWeight: 900 }}>Voir les articles →</div>
+
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          toggleFournisseurCommande(currentDemandeur.demandeur, group.fournisseur);
+                        }}
+                        style={commandeBtn(isCommande)}
+                      >
+                        {isCommande ? "Commandé" : "Marquer"}
+                      </button>
                     </div>
-                    <div style={{ marginTop: 16, color: t.accent, fontWeight: 900 }}>Voir les articles →</div>
-                  </button>
-                ))}
+                  );
+                })}
               </div>
             </div>
           ) : currentDemandeur && currentFournisseur ? (
@@ -635,15 +688,47 @@ function gridCards(): React.CSSProperties {
   };
 }
 
-function selectCard(t: any): React.CSSProperties {
+function selectCard(t: any, isCommande = false): React.CSSProperties {
   return {
     ...glassCard(t),
     minHeight: 190,
     textAlign: "left",
-    color: t.text,
+    color: isCommande ? "#052e16" : t.text,
     cursor: "pointer",
-    transition: "transform 0.18s ease, border 0.18s ease",
+    transition: "transform 0.18s ease, border 0.18s ease, background 0.18s ease",
     width: "100%",
+    position: "relative",
+    paddingBottom: 62,
+    background: isCommande ? "linear-gradient(135deg, #bbf7d0, #86efac)" : t.glass,
+    border: isCommande ? "1px solid #22c55e" : `1px solid ${t.border}`,
+    boxShadow: isCommande ? "0 18px 42px rgba(34,197,94,0.24)" : `0 20px 50px ${t.glow}`,
+  };
+}
+
+function commandeTheme(t: any) {
+  return {
+    ...t,
+    glass: "rgba(255,255,255,0.46)",
+    border: "rgba(22,101,52,0.28)",
+    text: "#052e16",
+    textSoft: "#166534",
+  };
+}
+
+function commandeBtn(isCommande: boolean): React.CSSProperties {
+  return {
+    position: "absolute",
+    right: 14,
+    bottom: 14,
+    border: isCommande ? "1px solid #14532d" : "1px solid #22c55e",
+    background: isCommande ? "#14532d" : "#22c55e",
+    color: "#fff",
+    borderRadius: 999,
+    padding: "9px 13px",
+    fontSize: 12,
+    fontWeight: 900,
+    cursor: "pointer",
+    boxShadow: "0 10px 24px rgba(34,197,94,0.28)",
   };
 }
 
